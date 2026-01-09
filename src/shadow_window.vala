@@ -43,7 +43,29 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
     private void setup_window() {
         set_decorated(false);
-        set_default_size(900 + SHADOW_SIZE * 2, 600 + SHADOW_SIZE * 2);
+
+        // Calculate initial window size based on screen dimensions
+        var display = Gdk.Display.get_default();
+        if (display != null) {
+            var monitors = display.get_monitors();
+            if (monitors.get_n_items() > 0) {
+                var monitor = (Gdk.Monitor)monitors.get_item(0);
+                var geometry = monitor.get_geometry();
+                int screen_width = geometry.width;
+                int screen_height = geometry.height;
+
+                int window_width = (int)(screen_width * 0.618) + SHADOW_SIZE * 2;
+                int window_height = (int)(screen_height * 0.618) + SHADOW_SIZE * 2;
+
+                set_default_size(window_width, window_height);
+            } else {
+                // Fallback if no monitor detected
+                set_default_size(900 + SHADOW_SIZE * 2, 600 + SHADOW_SIZE * 2);
+            }
+        } else {
+            // Fallback if no display detected
+            set_default_size(900 + SHADOW_SIZE * 2, 600 + SHADOW_SIZE * 2);
+        }
 
         // Make window transparent
         add_css_class("shadow-window");
