@@ -3,6 +3,8 @@
 public class TerminalTab : Gtk.Box {
     private Vte.Terminal terminal;
     public string tab_title { get; private set; }
+    private Gdk.RGBA foreground_color;
+    private Gdk.RGBA[] color_palette;
 
     private static string? cached_mono_font = null;
 
@@ -54,34 +56,34 @@ public class TerminalTab : Gtk.Box {
         terminal.set_color_background(bg);
         terminal.set_clear_background(false);  // Enable transparent background
 
-        var fg = Gdk.RGBA();
-        fg.parse("#00cd00");  // Green foreground
-        terminal.set_color_foreground(fg);
+        foreground_color = Gdk.RGBA();
+        foreground_color.parse("#00cd00");  // Green foreground
+        terminal.set_color_foreground(foreground_color);
 
         // Set 16-color palette
-        Gdk.RGBA[] palette = new Gdk.RGBA[16];
+        color_palette = new Gdk.RGBA[16];
 
         // Color 0-7 (normal colors)
-        palette[0].parse("#073642");  // color_1
-        palette[1].parse("#bdb76b");  // color_2
-        palette[2].parse("#859900");  // color_3
-        palette[3].parse("#b58900");  // color_4
-        palette[4].parse("#3465a4");  // color_5
-        palette[5].parse("#d33682");  // color_6
-        palette[6].parse("#2aa198");  // color_7
-        palette[7].parse("#eee8d5");  // color_8
+        color_palette[0].parse("#073642");  // color_1
+        color_palette[1].parse("#bdb76b");  // color_2
+        color_palette[2].parse("#859900");  // color_3
+        color_palette[3].parse("#b58900");  // color_4
+        color_palette[4].parse("#3465a4");  // color_5
+        color_palette[5].parse("#d33682");  // color_6
+        color_palette[6].parse("#2aa198");  // color_7
+        color_palette[7].parse("#eee8d5");  // color_8
 
         // Color 8-15 (bright colors)
-        palette[8].parse("#002b36");   // color_9
-        palette[9].parse("#8b0000");   // color_10
-        palette[10].parse("#00ff00");  // color_11
-        palette[11].parse("#657b83");  // color_12
-        palette[12].parse("#1e90ff");  // color_13
-        palette[13].parse("#6c71c4");  // color_14
-        palette[14].parse("#93a1a1");  // color_15
-        palette[15].parse("#fdf6e3");  // color_16
+        color_palette[8].parse("#002b36");   // color_9
+        color_palette[9].parse("#8b0000");   // color_10
+        color_palette[10].parse("#00ff00");  // color_11
+        color_palette[11].parse("#657b83");  // color_12
+        color_palette[12].parse("#1e90ff");  // color_13
+        color_palette[13].parse("#6c71c4");  // color_14
+        color_palette[14].parse("#93a1a1");  // color_15
+        color_palette[15].parse("#fdf6e3");  // color_16
 
-        terminal.set_colors(fg, bg, palette);
+        terminal.set_colors(foreground_color, bg, color_palette);
 
         // Set font - use first available monospace font from system
         string mono_font = get_mono_font();
@@ -145,5 +147,14 @@ public class TerminalTab : Gtk.Box {
 
     public new void grab_focus() {
         terminal.grab_focus();
+    }
+
+    public void set_background_opacity(double opacity) {
+        var bg = Gdk.RGBA();
+        bg.red = 0.0f;
+        bg.green = 0.0f;
+        bg.blue = 0.0f;
+        bg.alpha = (float)opacity;
+        terminal.set_colors(foreground_color, bg, color_palette);
     }
 }

@@ -6,6 +6,8 @@ public class TerminalWindow : ShadowWindow {
     private List<TerminalTab> tabs;
     private int tab_counter = 0;
     private Gtk.Box main_box;
+    private double background_opacity = 0.88;
+    private Gtk.CssProvider css_provider;
 
     public TerminalWindow(Gtk.Application app) {
         Object(application: app);
@@ -27,17 +29,27 @@ public class TerminalWindow : ShadowWindow {
     }
 
     private void load_css() {
-        var provider = new Gtk.CssProvider();
-        provider.load_from_string("""
+        css_provider = new Gtk.CssProvider();
+        update_opacity_css();
+
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
+    }
+
+    private void update_opacity_css() {
+        string css = """
             .transparent-window {
-                background-color: rgba(0, 0, 0, 0.88);
+                background-color: rgba(0, 0, 0, """ + background_opacity.to_string() + """);
                 border-radius: 6px;
             }
             .transparent-window.maximized {
                 border-radius: 0;
             }
             .tab-bar {
-                background-color: rgba(0, 0, 0, 0.88);
+                background-color: rgba(0, 0, 0, """ + background_opacity.to_string() + """);
                 min-height: 38px;
                 border-radius: 6px 6px 0 0;
             }
@@ -59,13 +71,8 @@ public class TerminalWindow : ShadowWindow {
             .transparent-tab {
                 background-color: transparent;
             }
-        """);
-
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        );
+        """;
+        css_provider.load_from_string(css);
     }
 
     private void setup_layout() {
@@ -95,6 +102,9 @@ public class TerminalWindow : ShadowWindow {
 
         // Enable window dragging from tab bar
         setup_window_drag();
+
+        // Setup opacity control with Ctrl+Scroll
+        setup_opacity_control();
     }
 
     private void setup_window_drag() {
@@ -247,6 +257,51 @@ public class TerminalWindow : ShadowWindow {
         ((Gtk.Widget)this).add_controller(controller);
     }
 
+    private void setup_opacity_control() {
+        var scroll_controller = new Gtk.EventControllerScroll(
+            Gtk.EventControllerScrollFlags.VERTICAL
+        );
+
+        // Set to CAPTURE phase to intercept before terminal receives event
+        scroll_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+
+        scroll_controller.scroll.connect((dx, dy) => {
+            var state = scroll_controller.get_current_event_state();
+            bool ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0;
+
+            if (ctrl) {
+                // dy > 0 means scroll down, dy < 0 means scroll up
+                // Scroll up increases opacity, scroll down decreases opacity
+                double delta = -dy * 0.05;  // 5% change per scroll step
+                double old_opacity = background_opacity;
+                background_opacity = double.max(0.3, double.min(1.0, background_opacity + delta));
+
+                print("Opacity changed: %.2f -> %.2f (delta: %.3f)\n", old_opacity, background_opacity, delta);
+
+                // Update CSS
+                update_opacity_css();
+
+                // Update all terminal backgrounds
+                update_all_terminal_opacity();
+
+                // Force redraw
+                queue_draw();
+
+                return true;
+            }
+
+            return false;
+        });
+
+        ((Gtk.Widget)this).add_controller(scroll_controller);
+    }
+
+    private void update_all_terminal_opacity() {
+        foreach (var tab in tabs) {
+            tab.set_background_opacity(background_opacity);
+        }
+    }
+
     private void cycle_tab(int direction) {
         int current = tab_bar.get_active_index();
         int count = (int)tabs.length();
@@ -260,6 +315,9 @@ public class TerminalWindow : ShadowWindow {
     public void add_new_tab() {
         tab_counter++;
         var tab = new TerminalTab("Terminal " + tab_counter.to_string());
+
+        // Set initial background opacity
+        tab.set_background_opacity(background_opacity);
 
         tab.title_changed.connect((title) => {
             tab_bar.update_tab_title(tabs.index(tab), title);
