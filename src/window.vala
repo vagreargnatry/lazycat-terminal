@@ -31,10 +31,19 @@ public class TerminalWindow : ShadowWindow {
         provider.load_from_string("""
             .transparent-window {
                 background-color: rgba(0, 0, 0, 0.88);
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            .transparent-window.maximized {
+                border-radius: 0;
             }
             .tab-bar {
                 background-color: rgba(0, 0, 0, 0.88);
                 min-height: 38px;
+                border-radius: 6px 6px 0 0;
+            }
+            .tab-bar.maximized {
+                border-radius: 0;
             }
             .terminal-container {
                 background-color: transparent;
@@ -51,6 +60,7 @@ public class TerminalWindow : ShadowWindow {
     private void setup_layout() {
         main_box = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
         main_box.add_css_class("transparent-window");
+        main_box.set_overflow(Gtk.Overflow.HIDDEN);
 
         // Create tab bar
         tab_bar = new TabBar();
@@ -304,6 +314,7 @@ public class TerminalWindow : ShadowWindow {
         // Check if maximized first
         if (is_maximized()) {
             set_snap_position(WindowSnapPosition.MAXIMIZED);
+            update_corner_style(true);
             return;
         }
 
@@ -347,30 +358,39 @@ public class TerminalWindow : ShadowWindow {
         // the window's actual allocation or surface position
 
         WindowSnapPosition new_position = WindowSnapPosition.NONE;
+        bool is_snapped = false;
 
         if (is_half_width && is_full_height) {
-            // Left or right half snap - need to determine which side
-            // Check window position using surface
-            var surface = get_surface();
-            if (surface != null) {
-                // Try to get position through frame clock or other means
-                // For now, we'll use a heuristic based on pointer position
-                // or rely on the snap gesture tracking
-                new_position = WindowSnapPosition.NONE; // Will be set by explicit snap
-            }
+            // Left or right half snap
+            is_snapped = true;
+            new_position = WindowSnapPosition.MAXIMIZED;
         } else if (is_half_width && is_half_height) {
             // Corner snap
-            new_position = WindowSnapPosition.NONE; // Will be set by explicit snap
+            is_snapped = true;
+            new_position = WindowSnapPosition.MAXIMIZED;
         }
 
+        update_corner_style(is_snapped);
+
         // Only update if different (avoid constant redraws)
-        if (new_position != get_snap_position() && new_position != WindowSnapPosition.NONE) {
+        if (new_position != get_snap_position()) {
             set_snap_position(new_position);
+        }
+    }
+
+    private void update_corner_style(bool is_snapped) {
+        if (is_snapped) {
+            main_box.add_css_class("maximized");
+            tab_bar.add_css_class("maximized");
+        } else {
+            main_box.remove_css_class("maximized");
+            tab_bar.remove_css_class("maximized");
         }
     }
 
     // Public method to explicitly set snap position from window manager hints
     public void notify_snap_position(WindowSnapPosition position) {
         set_snap_position(position);
+        update_corner_style(position == WindowSnapPosition.MAXIMIZED);
     }
 }

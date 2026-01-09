@@ -62,7 +62,9 @@ public class ShadowWindow : Gtk.ApplicationWindow {
             .shadow-container {
                 background-color: transparent;
                 box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
-                transition: box-shadow 150ms ease-in-out;
+                border-radius: 6px;
+                overflow: hidden;
+                transition: box-shadow 150ms ease-in-out, border-radius 150ms ease-in-out;
             }
 
             .shadow-container.unfocused {
@@ -71,6 +73,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
             .shadow-container.maximized {
                 box-shadow: none;
+                border-radius: 0;
             }
 
             .shadow-container.snap-left {
@@ -129,6 +132,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
         content_box.add_css_class("shadow-container");
         content_box.set_hexpand(true);
         content_box.set_vexpand(true);
+        content_box.set_overflow(Gtk.Overflow.HIDDEN);
         update_content_margins();
 
         set_child(content_box);
