@@ -40,6 +40,8 @@ public class TerminalWindow : ShadowWindow {
     }
 
     private void update_opacity_css() {
+        double tab_bar_opacity = double.min(1.0, background_opacity + 0.01);
+
         string css = """
             .transparent-window {
                 background-color: rgba(0, 0, 0, """ + background_opacity.to_string() + """);
@@ -49,7 +51,7 @@ public class TerminalWindow : ShadowWindow {
                 border-radius: 0;
             }
             .tab-bar {
-                background-color: rgba(0, 0, 0, """ + background_opacity.to_string() + """);
+                background-color: rgba(0, 0, 0, """ + tab_bar_opacity.to_string() + """);
                 min-height: 38px;
                 border-radius: 6px 6px 0 0;
             }
@@ -83,6 +85,7 @@ public class TerminalWindow : ShadowWindow {
         // Create tab bar
         tab_bar = new TabBar();
         tab_bar.add_css_class("tab-bar");
+        tab_bar.set_background_opacity(0.89);  // Initial opacity (0.88 + 0.01)
         tab_bar.tab_selected.connect(on_tab_selected);
         tab_bar.tab_closed.connect(on_tab_closed);
         tab_bar.new_tab_requested.connect(add_new_tab);
@@ -273,13 +276,14 @@ public class TerminalWindow : ShadowWindow {
                 // dy > 0 means scroll down, dy < 0 means scroll up
                 // Scroll up increases opacity, scroll down decreases opacity
                 double delta = -dy * 0.05;  // 5% change per scroll step
-                double old_opacity = background_opacity;
                 background_opacity = double.max(0.3, double.min(1.0, background_opacity + delta));
 
-                print("Opacity changed: %.2f -> %.2f (delta: %.3f)\n", old_opacity, background_opacity, delta);
-
-                // Update CSS
+                // Update CSS for window background
                 update_opacity_css();
+
+                // Update tab bar opacity (always 0.01 higher than background)
+                double tab_bar_opacity = double.min(1.0, background_opacity + 0.01);
+                tab_bar.set_background_opacity(tab_bar_opacity);
 
                 // Update all terminal backgrounds
                 update_all_terminal_opacity();

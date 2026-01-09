@@ -8,6 +8,7 @@ public class TabBar : Gtk.DrawingArea {
     private int pressed_control = -1;
     private bool hover_new_tab = false;
     private bool pressed_new_tab = false;
+    private double background_opacity = 0.93;  // Default opacity for tab bar
 
     // Window control button constants (80% of original 16px)
     private const double CTRL_BTN_SIZE = 12.8;
@@ -67,8 +68,8 @@ public class TabBar : Gtk.DrawingArea {
         // Calculate tab positions and widths
         calculate_tab_layout(width);
 
-        // Draw background - black with 0.88 opacity
-        cr.set_source_rgba(0.0, 0.0, 0.0, 0.88);
+        // Draw background with dynamic opacity
+        cr.set_source_rgba(0.0, 0.0, 0.0, background_opacity);
         cr.rectangle(0, 0, width, height);
         cr.fill();
 
@@ -504,5 +505,10 @@ public class TabBar : Gtk.DrawingArea {
 
     public int get_active_index() {
         return active_index;
+    }
+
+    public void set_background_opacity(double opacity) {
+        background_opacity = opacity;
+        queue_draw();
     }
 }
