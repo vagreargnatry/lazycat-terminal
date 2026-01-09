@@ -175,6 +175,7 @@ public class TabBar : Gtk.DrawingArea {
         double center_y = btn_y + NEW_TAB_BTN_SIZE / 2;
 
         // Plus icon with 10px padding inside the button area
+        cr.set_antialias(Cairo.Antialias.NONE);  // Disable anti-aliasing for crisp lines
         cr.set_line_width(1.0);  // Thinner line to match window control buttons
         cr.set_source_rgba(0.7, 0.7, 0.7, 1.0);  // Opaque color matching window control buttons
 
@@ -200,6 +201,9 @@ public class TabBar : Gtk.DrawingArea {
         if (window != null) {
             is_maximized = window.is_maximized();
         }
+
+        // Disable anti-aliasing for crisp lines
+        cr.set_antialias(Cairo.Antialias.NONE);
 
         // Draw each control button
         for (int i = 0; i < 3; i++) {
