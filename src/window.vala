@@ -90,32 +90,27 @@ public class TerminalWindow : Gtk.ApplicationWindow {
     }
 
     private void setup_window_drag() {
-        // Window move gesture
-        var drag = new Gtk.GestureDrag();
-        drag.set_button(1);
+        bool is_dragging = false;
+        double press_x = 0;
+        double press_y = 0;
 
-        drag.drag_begin.connect((x, y) => {
-            // Only drag from tab bar empty area
-            if (!tab_bar.is_over_tab((int)x, (int)y)) {
-                // Use native window drag
-                var surface = get_surface() as Gdk.Toplevel;
-                if (surface != null) {
-                    var device = drag.get_device();
-                    if (device != null) {
-                        // Get timestamp from the last event
-                        surface.begin_move(device, 0, x, y, Gdk.CURRENT_TIME);
-                    }
-                }
+        // Mouse press event
+        var click_gesture = new Gtk.GestureClick();
+        click_gesture.set_button(1);  // Left button only
+
+        click_gesture.pressed.connect((n_press, x, y) => {
+            // Ignore if over window controls
+            if (tab_bar.is_over_window_controls((int)x, (int)y)) {
+                return;
             }
-        });
 
-        tab_bar.add_controller(drag);
-
-        // Double-click to maximize/restore
-        var double_click = new Gtk.GestureClick();
-        double_click.set_button(1);
-        double_click.pressed.connect((n_press, x, y) => {
-            if (n_press == 2 && !tab_bar.is_over_tab((int)x, (int)y)) {
+            if (n_press == 1) {
+                // Single click - record press position for potential drag
+                press_x = x;
+                press_y = y;
+                is_dragging = false;
+            } else if (n_press == 2) {
+                // Double click - toggle maximize (anywhere except window controls)
                 if (is_maximized()) {
                     unmaximize();
                 } else {
@@ -123,7 +118,72 @@ public class TerminalWindow : Gtk.ApplicationWindow {
                 }
             }
         });
-        tab_bar.add_controller(double_click);
+
+        click_gesture.released.connect((n_press, x, y) => {
+            // Ignore if over window controls
+            if (tab_bar.is_over_window_controls((int)x, (int)y)) {
+                return;
+            }
+
+            // If not dragged, handle as click
+            if (!is_dragging && n_press == 1) {
+                // Check if clicked on new tab button
+                if (tab_bar.is_over_new_tab_button((int)x, (int)y)) {
+                    // Already handled by tab_bar's on_click
+                    return;
+                }
+
+                // Check if clicked on a tab - switch to it
+                int tab_index = tab_bar.get_tab_at((int)x, (int)y);
+                if (tab_index >= 0 && tab_index != tab_bar.get_active_index()) {
+                    tab_bar.set_active_tab(tab_index);
+                    on_tab_selected(tab_index);
+                }
+            }
+            is_dragging = false;
+        });
+
+        tab_bar.add_controller(click_gesture);
+
+        // Drag gesture for window dragging
+        var drag_gesture = new Gtk.GestureDrag();
+        drag_gesture.set_button(1);
+
+        drag_gesture.drag_begin.connect((x, y) => {
+            // Don't start drag if over window controls
+            if (tab_bar.is_over_window_controls((int)x, (int)y)) {
+                return;
+            }
+            press_x = x;
+            press_y = y;
+            is_dragging = false;
+        });
+
+        drag_gesture.drag_update.connect((offset_x, offset_y) => {
+            // Start window move if dragged more than a few pixels
+            if (!is_dragging && (Math.fabs(offset_x) > 3 || Math.fabs(offset_y) > 3)) {
+                // Check if the original press was over window controls
+                if (tab_bar.is_over_window_controls((int)press_x, (int)press_y)) {
+                    return;
+                }
+
+                is_dragging = true;
+                var surface = get_surface();
+                if (surface != null) {
+                    var toplevel = surface as Gdk.Toplevel;
+                    if (toplevel != null) {
+                        var device = drag_gesture.get_device();
+                        if (device != null) {
+                            double root_x, root_y;
+                            surface.get_device_position(device, out root_x, out root_y, null);
+                            toplevel.begin_move(device, 1, (int)root_x, (int)root_y, Gdk.CURRENT_TIME);
+                        }
+                    }
+                }
+            }
+        });
+
+        tab_bar.add_controller(drag_gesture);
 
         // Keyboard shortcuts
         setup_keyboard_shortcuts();

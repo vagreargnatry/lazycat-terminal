@@ -286,23 +286,28 @@ public class TabBar : Gtk.DrawingArea {
         }
     }
 
-    public bool is_over_tab(int x, int y) {
+    // Check if position is over window control buttons (minimize/maximize/close)
+    public bool is_over_window_controls(int x, int y) {
+        return x >= get_width() - 90;
+    }
+
+    // Get tab index at position, returns -1 if not over any tab
+    public int get_tab_at(int x, int y) {
+        if (y > TAB_HEIGHT + 4) return -1;
+
         for (int i = 0; i < tab_infos.length(); i++) {
             var info = tab_infos.nth_data((uint)i);
-            if (x >= info.x && x <= info.x + info.width && y <= TAB_HEIGHT) {
-                return true;
+            if (x >= info.x && x <= info.x + info.width) {
+                return i;
             }
         }
+        return -1;
+    }
 
-        // Also check new tab button and window controls
-        if (x >= get_new_tab_button_x() && x <= get_new_tab_button_x() + NEW_TAB_BTN_SIZE) {
-            return true;
-        }
-        if (x >= get_width() - 80) {
-            return true;
-        }
-
-        return false;
+    // Check if position is over new tab button
+    public bool is_over_new_tab_button(int x, int y) {
+        double btn_x = get_new_tab_button_x();
+        return x >= btn_x && x <= btn_x + NEW_TAB_BTN_SIZE && y <= TAB_HEIGHT + 4;
     }
 
     public void add_tab(string title) {
