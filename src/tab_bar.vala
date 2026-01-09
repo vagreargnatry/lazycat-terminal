@@ -4,7 +4,6 @@ public class TabBar : Gtk.DrawingArea {
     private List<TabInfo> tab_infos;
     private int active_index = -1;
     private int hover_index = -1;
-    private int hover_close_index = -1;
 
     private const int TAB_HEIGHT = 34;
     private const int TAB_MIN_WIDTH = 80;
@@ -112,53 +111,20 @@ public class TabBar : Gtk.DrawingArea {
         double w = info.width;
         double h = TAB_HEIGHT;
         double y = height - h;
-        double r = CORNER_RADIUS;
-
-        // Chrome-style tab shape with curved corners
-        cr.new_path();
-
-        // Left curve (connecting to tab bar)
-        cr.move_to(x, height);
-        cr.curve_to(x, height, x, y + h - r, x + r, y + r);
-
-        // Left side and top-left corner
-        cr.curve_to(x + r, y, x + r * 2, y, x + r * 2, y);
-
-        // Top edge
-        cr.line_to(x + w - r * 2, y);
-
-        // Top-right corner
-        cr.curve_to(x + w - r * 2, y, x + w - r, y, x + w - r, y + r);
-
-        // Right curve (connecting to tab bar)
-        cr.curve_to(x + w, y + h - r, x + w, height, x + w, height);
-
-        cr.close_path();
-
-        // Fill
-        if (is_active) {
-            cr.set_source_rgba(0.18, 0.18, 0.18, 1.0);
-        } else if (index == hover_index) {
-            cr.set_source_rgba(0.22, 0.22, 0.22, 0.9);
-        } else {
-            cr.set_source_rgba(0.14, 0.14, 0.14, 0.8);
-        }
-        cr.fill_preserve();
-
-        // Border for active tab
-        if (is_active) {
-            cr.set_source_rgba(0.3, 0.3, 0.3, 1.0);
-            cr.set_line_width(1.0);
-            cr.stroke();
-        } else {
-            cr.new_path();
-        }
 
         // Tab title
         draw_tab_title(cr, info, x, y, w, h, is_active);
 
-        // Close button
-        draw_close_button(cr, index, x, y, w, h);
+        // Draw underline for active tab (full width of tab)
+        if (is_active) {
+            double underline_y = height - 2;
+
+            cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
+            cr.set_line_width(2.0);
+            cr.move_to(x, underline_y);
+            cr.line_to(x + w, underline_y);
+            cr.stroke();
+        }
     }
 
     private void draw_tab_title(Cairo.Context cr, TabInfo info, double x, double y, double w, double h, bool is_active) {
@@ -166,8 +132,9 @@ public class TabBar : Gtk.DrawingArea {
         cr.set_font_size(12);
 
         // Truncate title if needed
+        // Text area: tab width - 40px (20px padding on each side)
         string title = info.title;
-        double max_text_width = w - TAB_PADDING * 2 - CLOSE_BTN_SIZE - 8;
+        double max_text_width = w - 40;
 
         Cairo.TextExtents extents;
         cr.text_extents(title, out extents);
@@ -179,7 +146,8 @@ public class TabBar : Gtk.DrawingArea {
             }
         }
 
-        double text_x = x + TAB_PADDING;
+        // Center text horizontally in tab
+        double text_x = x + (w - extents.width) / 2;
         double text_y = y + h / 2 + extents.height / 2 - 2;
 
         if (is_active) {
@@ -192,49 +160,13 @@ public class TabBar : Gtk.DrawingArea {
         cr.show_text(title);
     }
 
-    private void draw_close_button(Cairo.Context cr, int index, double x, double y, double w, double h) {
-        double btn_x = x + w - TAB_PADDING - CLOSE_BTN_SIZE;
-        double btn_y = y + (h - CLOSE_BTN_SIZE) / 2;
-        double center_x = btn_x + CLOSE_BTN_SIZE / 2;
-        double center_y = btn_y + CLOSE_BTN_SIZE / 2;
-
-        // Hover background
-        if (hover_close_index == index) {
-            cr.arc(center_x, center_y, CLOSE_BTN_SIZE / 2, 0, 2 * Math.PI);
-            cr.set_source_rgba(0.4, 0.4, 0.4, 0.8);
-            cr.fill();
-        }
-
-        // X icon
-        double offset = 4;
-        cr.set_line_width(1.5);
-        cr.set_source_rgba(0.6, 0.6, 0.6, 1.0);
-
-        if (hover_close_index == index) {
-            cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
-        }
-
-        cr.move_to(center_x - offset, center_y - offset);
-        cr.line_to(center_x + offset, center_y + offset);
-        cr.stroke();
-
-        cr.move_to(center_x + offset, center_y - offset);
-        cr.line_to(center_x - offset, center_y + offset);
-        cr.stroke();
-    }
-
     private void draw_new_tab_button(Cairo.Context cr, int width, int height) {
         double btn_x = get_new_tab_button_x();
         double btn_y = (height - NEW_TAB_BTN_SIZE) / 2;
         double center_x = btn_x + NEW_TAB_BTN_SIZE / 2;
         double center_y = btn_y + NEW_TAB_BTN_SIZE / 2;
 
-        // Button background
-        cr.arc(center_x, center_y, NEW_TAB_BTN_SIZE / 2 - 2, 0, 2 * Math.PI);
-        cr.set_source_rgba(0.25, 0.25, 0.25, 0.8);
-        cr.fill();
-
-        // Plus icon
+        // Plus icon only, no background
         cr.set_line_width(2.0);
         cr.set_source_rgba(0.7, 0.7, 0.7, 1.0);
 
@@ -279,37 +211,26 @@ public class TabBar : Gtk.DrawingArea {
 
     private void on_motion(double x, double y) {
         int old_hover = hover_index;
-        int old_close_hover = hover_close_index;
 
         hover_index = -1;
-        hover_close_index = -1;
 
         // Check tabs
         for (int i = 0; i < tab_infos.length(); i++) {
             var info = tab_infos.nth_data((uint)i);
             if (x >= info.x && x <= info.x + info.width && y <= TAB_HEIGHT + 4) {
                 hover_index = i;
-
-                // Check close button
-                double btn_x = info.x + info.width - TAB_PADDING - CLOSE_BTN_SIZE;
-                double btn_y = (TAB_HEIGHT - CLOSE_BTN_SIZE) / 2;
-                if (x >= btn_x && x <= btn_x + CLOSE_BTN_SIZE &&
-                    y >= btn_y && y <= btn_y + CLOSE_BTN_SIZE) {
-                    hover_close_index = i;
-                }
                 break;
             }
         }
 
-        if (old_hover != hover_index || old_close_hover != hover_close_index) {
+        if (old_hover != hover_index) {
             queue_draw();
         }
     }
 
     private void on_leave() {
-        if (hover_index != -1 || hover_close_index != -1) {
+        if (hover_index != -1) {
             hover_index = -1;
-            hover_close_index = -1;
             queue_draw();
         }
     }
@@ -355,12 +276,6 @@ public class TabBar : Gtk.DrawingArea {
                     return;
                 }
             }
-        }
-
-        // Check close buttons
-        if (hover_close_index >= 0) {
-            tab_closed(hover_close_index);
-            return;
         }
 
         // Check tab selection
