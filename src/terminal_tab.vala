@@ -1502,9 +1502,9 @@ public class TerminalTab : Gtk.Box {
 
         string message;
         if (specific_terminal != null) {
-            message = "终端中有正在运行的进程\n是否确认结束？";
+            message = "Process is running in terminal\nConfirm to terminate?";
         } else {
-            message = "有终端正在运行进程\n是否确认全部结束？";
+            message = "Processes are running in terminals\nConfirm to terminate all?";
         }
 
         var dialog = new ConfirmDialog(window, message, foreground_color);

@@ -29,7 +29,7 @@ public class ConfirmDialog : Gtk.Window {
     }
 
     private void setup_window() {
-        set_default_size(400 + SHADOW_SIZE * 2, 200 + SHADOW_SIZE * 2);
+        set_default_size(320 + SHADOW_SIZE * 2, 130 + SHADOW_SIZE * 2);
         set_decorated(false);
         set_resizable(false);
 
@@ -66,7 +66,7 @@ public class ConfirmDialog : Gtk.Window {
             .confirm-message {
                 color: """ + fg_hex + """;
                 font-size: 14px;
-                padding: 20px;
+                padding: 5px 15px 10px 15px;
             }
 
             .confirm-button {
@@ -75,8 +75,8 @@ public class ConfirmDialog : Gtk.Window {
                 color: """ + fg_hex + """;
                 border: 1px solid """ + fg_hex + """;
                 border-radius: 4px;
-                padding: 8px 16px;
-                min-width: 100px;
+                padding: 6px 12px;
+                min-width: 80px;
                 outline: none;
                 box-shadow: none;
             }
@@ -134,19 +134,42 @@ public class ConfirmDialog : Gtk.Window {
         shadow_container.set_hexpand(true);
         shadow_container.set_vexpand(true);
 
+        // Create overlay for floating close button
+        var overlay = new Gtk.Overlay();
+
         main_box = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
         main_box.add_css_class("confirm-dialog");
 
-        // Title bar with close button
-        var title_bar = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
-        title_bar.set_hexpand(true);
+        // Message label
+        message_label = new Gtk.Label(message);
+        message_label.add_css_class("confirm-message");
+        message_label.set_wrap(true);
+        message_label.set_justify(Gtk.Justification.CENTER);
+        message_label.set_vexpand(true);
+        message_label.set_valign(Gtk.Align.CENTER);
+        message_label.set_margin_top(15);
 
-        // Spacer
-        var spacer = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
-        spacer.set_hexpand(true);
-        spacer.set_size_request(-1, 38);
+        // Button box
+        var button_box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 10);
+        button_box.set_halign(Gtk.Align.CENTER);
+        button_box.set_margin_bottom(17);
 
-        // Close button (DrawingArea for custom drawing)
+        confirm_button = new Gtk.Button.with_label("Confirm");
+        confirm_button.add_css_class("confirm-button");
+        confirm_button.clicked.connect(() => {
+            confirmed();
+            hide();
+        });
+
+        button_box.append(confirm_button);
+
+        main_box.append(message_label);
+        main_box.append(button_box);
+
+        // Set main_box as overlay base
+        overlay.set_child(main_box);
+
+        // Close button (DrawingArea for custom drawing) - floats on top
         close_button = new Gtk.DrawingArea();
         close_button.set_size_request(CLOSE_BTN_SIZE * 2 + 10, CLOSE_BTN_SIZE * 2 + 10);
         close_button.set_valign(Gtk.Align.START);
@@ -158,36 +181,10 @@ public class ConfirmDialog : Gtk.Window {
         // Setup close button interactions
         setup_close_button_interactions();
 
-        title_bar.append(spacer);
-        title_bar.append(close_button);
+        // Add close button as overlay
+        overlay.add_overlay(close_button);
 
-        // Message label
-        message_label = new Gtk.Label(message);
-        message_label.add_css_class("confirm-message");
-        message_label.set_wrap(true);
-        message_label.set_justify(Gtk.Justification.CENTER);
-        message_label.set_vexpand(true);
-        message_label.set_valign(Gtk.Align.CENTER);
-
-        // Button box
-        var button_box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 10);
-        button_box.set_halign(Gtk.Align.CENTER);
-        button_box.set_margin_bottom(20);
-
-        confirm_button = new Gtk.Button.with_label("确认结束");
-        confirm_button.add_css_class("confirm-button");
-        confirm_button.clicked.connect(() => {
-            confirmed();
-            hide();
-        });
-
-        button_box.append(confirm_button);
-
-        main_box.append(title_bar);
-        main_box.append(message_label);
-        main_box.append(button_box);
-
-        shadow_container.append(main_box);
+        shadow_container.append(overlay);
         set_child(shadow_container);
 
         // Setup keyboard shortcuts
@@ -207,20 +204,12 @@ public class ConfirmDialog : Gtk.Window {
         double center_x = width / 2.0;
         double center_y = height / 2.0;
 
-        // Determine alpha based on hover/pressed state
-        double alpha = 0.6;  // Default: subtle
-        if (close_button_pressed) {
-            alpha = 1.0;  // Pressed: full brightness
-        } else if (close_button_hover) {
-            alpha = 0.85;  // Hover: brighter
-        }
-
-        // Use VTE foreground color instead of gray
+        // Use VTE foreground color (same as border)
         cr.set_source_rgba(
             foreground_color.red,
             foreground_color.green,
             foreground_color.blue,
-            alpha
+            1.0
         );
         cr.set_line_width(1.0);
         cr.set_antialias(Cairo.Antialias.NONE);
