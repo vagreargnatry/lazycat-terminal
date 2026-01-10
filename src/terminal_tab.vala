@@ -3,6 +3,7 @@
 public class TerminalTab : Gtk.Box {
     private Gtk.Widget root_widget;  // Can be a scrolled window or a Paned
     private Vte.Terminal? focused_terminal;  // Currently focused terminal
+    private List<Vte.Terminal> terminal_list;  // Track all terminals in this tab
     public string tab_title { get; private set; }
     private Gdk.RGBA foreground_color;
     private Gdk.RGBA[] color_palette;
@@ -22,6 +23,9 @@ public class TerminalTab : Gtk.Box {
     }
 
     construct {
+        // Initialize terminal list (GLib.List starts as null)
+        terminal_list = null;
+
         // Create initial terminal
         var terminal = create_terminal();
         focused_terminal = terminal;
@@ -122,7 +126,7 @@ public class TerminalTab : Gtk.Box {
         });
 
         terminal.child_exited.connect(() => {
-            close_requested();
+            close_terminal(terminal);
         });
 
         // Setup focus tracking using GTK4 EventControllerFocus
@@ -131,6 +135,9 @@ public class TerminalTab : Gtk.Box {
             focused_terminal = terminal;
         });
         terminal.add_controller(focus_controller);
+
+        // Add terminal to list
+        terminal_list.append(terminal);
 
         return terminal;
     }
@@ -468,5 +475,176 @@ public class TerminalTab : Gtk.Box {
         focused_terminal = new_terminal;
         new_terminal.grab_focus();
         stdout.printf("DEBUG: Focused new terminal\n");
+    }
+
+    // Close a single terminal and clean up the widget tree
+    private void close_terminal(Vte.Terminal terminal) {
+        stdout.printf("DEBUG: close_terminal() called for terminal %p\n", terminal);
+
+        // Remove from terminal list
+        terminal_list.remove(terminal);
+        stdout.printf("DEBUG: Removed from terminal_list, remaining terminals: %u\n", terminal_list.length());
+
+        // Get the terminal's parent (should be ScrolledWindow)
+        Gtk.Widget? scrolled = terminal.get_parent();
+        if (scrolled == null) {
+            stdout.printf("DEBUG: Terminal has no parent, returning\n");
+            return;
+        }
+
+        // Get the ScrolledWindow's parent (could be TerminalTab or Paned)
+        Gtk.Widget? parent = scrolled.get_parent();
+        if (parent == null) {
+            stdout.printf("DEBUG: ScrolledWindow has no parent, returning\n");
+            return;
+        }
+
+        // Remove the scrolled window from its parent
+        if (parent is Gtk.Box) {
+            ((Gtk.Box)parent).remove(scrolled);
+        } else if (parent is Gtk.Paned) {
+            var paned = (Gtk.Paned)parent;
+            if (paned.get_start_child() == scrolled) {
+                paned.set_start_child(null);
+            } else {
+                paned.set_end_child(null);
+            }
+        }
+
+        // Destroy the widgets
+        terminal.unref();
+        scrolled.unref();
+        stdout.printf("DEBUG: Destroyed terminal and scrolled window\n");
+
+        // Clean up unused parent containers
+        clean_unused_parent(parent);
+
+        // If no terminals left, close the tab
+        if (terminal_list.length() == 0) {
+            stdout.printf("DEBUG: No terminals left, closing tab\n");
+            close_requested();
+        }
+    }
+
+    // Recursively clean up empty parent containers
+    private void clean_unused_parent(Gtk.Widget container) {
+        stdout.printf("DEBUG: clean_unused_parent() called for container %p\n", container);
+
+        if (container is Gtk.Paned) {
+            var paned = (Gtk.Paned)container;
+            var start_child = paned.get_start_child();
+            var end_child = paned.get_end_child();
+
+            // If paned has no children, remove it
+            if (start_child == null && end_child == null) {
+                stdout.printf("DEBUG: Paned has no children, removing it\n");
+                Gtk.Widget? parent = paned.get_parent();
+                if (parent == null) {
+                    return;
+                }
+
+                // Remove paned from its parent
+                if (parent is Gtk.Box) {
+                    ((Gtk.Box)parent).remove(paned);
+                } else if (parent is Gtk.Paned) {
+                    var parent_paned = (Gtk.Paned)parent;
+                    if (parent_paned.get_start_child() == paned) {
+                        parent_paned.set_start_child(null);
+                    } else {
+                        parent_paned.set_end_child(null);
+                    }
+                }
+
+                paned.unref();
+
+                // Continue cleaning up parent
+                clean_unused_parent(parent);
+            }
+            // If paned has only one child, replace paned with that child
+            else if (start_child != null && end_child == null) {
+                stdout.printf("DEBUG: Paned has only start child, replacing paned with child\n");
+                replace_paned_with_child(paned, start_child);
+            }
+            else if (start_child == null && end_child != null) {
+                stdout.printf("DEBUG: Paned has only end child, replacing paned with child\n");
+                replace_paned_with_child(paned, end_child);
+            }
+            // If paned has both children, focus one of them
+            else {
+                stdout.printf("DEBUG: Paned has both children, focusing one\n");
+                focus_terminal_in_widget(start_child);
+            }
+        } else if (container == this) {
+            // If we're at the TerminalTab level, check if we need to close
+            stdout.printf("DEBUG: Reached TerminalTab level\n");
+            if (terminal_list.length() == 0) {
+                stdout.printf("DEBUG: No terminals left at TerminalTab level, closing tab\n");
+                close_requested();
+            }
+        }
+    }
+
+    // Replace a paned with its only child
+    private void replace_paned_with_child(Gtk.Paned paned, Gtk.Widget child) {
+        Gtk.Widget? parent = paned.get_parent();
+        if (parent == null) {
+            return;
+        }
+
+        // Remove child from paned
+        if (paned.get_start_child() == child) {
+            paned.set_start_child(null);
+        } else {
+            paned.set_end_child(null);
+        }
+
+        // Replace paned with child in parent
+        if (parent == this) {
+            // Parent is TerminalTab
+            remove(paned);
+            root_widget = child;
+            append(child);
+        } else if (parent is Gtk.Paned) {
+            // Parent is another Paned
+            var parent_paned = (Gtk.Paned)parent;
+            if (parent_paned.get_start_child() == paned) {
+                parent_paned.set_start_child(null);
+                parent_paned.set_start_child(child);
+            } else {
+                parent_paned.set_end_child(null);
+                parent_paned.set_end_child(child);
+            }
+        }
+
+        // Destroy the paned
+        paned.unref();
+
+        // Focus a terminal in the child
+        focus_terminal_in_widget(child);
+    }
+
+    // Find and focus a terminal in the widget tree
+    private void focus_terminal_in_widget(Gtk.Widget widget) {
+        if (widget is Gtk.ScrolledWindow) {
+            var scrolled = (Gtk.ScrolledWindow)widget;
+            var child = scrolled.get_child();
+            if (child is Vte.Terminal) {
+                var terminal = (Vte.Terminal)child;
+                focused_terminal = terminal;
+                terminal.grab_focus();
+                stdout.printf("DEBUG: Focused terminal %p\n", terminal);
+            }
+        } else if (widget is Gtk.Paned) {
+            var paned = (Gtk.Paned)widget;
+            var start_child = paned.get_start_child();
+            if (start_child != null) {
+                focus_terminal_in_widget(start_child);
+            } else {
+                var end_child = paned.get_end_child();
+                if (end_child != null) {
+                    focus_terminal_in_widget(end_child);
+                }
+            }
+        }
     }
 }
