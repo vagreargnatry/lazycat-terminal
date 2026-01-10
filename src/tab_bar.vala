@@ -10,6 +10,10 @@ public class TabBar : Gtk.DrawingArea {
     private bool pressed_new_tab = false;
     private double background_opacity = 0.93;  // Default opacity for tab bar
 
+    // Tab close button state
+    private int hover_close_index = -1;  // Which tab's close button is being hovered
+    private int pressed_close_index = -1;  // Which tab's close button is being pressed
+
     // Scrolling state
     private bool scrolling_enabled = false;
     private double scroll_offset = 0.0;  // Current scroll position (pixels from left)
@@ -28,7 +32,8 @@ public class TabBar : Gtk.DrawingArea {
     private const int TAB_MAX_WIDTH = 200;
     private const int TAB_OVERLAP = 16;
     private const int TAB_PADDING = 12;
-    private const int CLOSE_BTN_SIZE = 16;
+    private const int TAB_CLOSE_BTN_SIZE = 10;  // Close button size (60% of original 16px)
+    private const int TAB_CLOSE_BTN_PADDING = 8;  // Padding from right edge
     private const int NEW_TAB_BTN_SIZE = 36;  // 36px button size
     private const int NEW_TAB_BTN_MARGIN_LEFT = 20;  // 20px left margin
     private const int CORNER_RADIUS = 10;
@@ -200,6 +205,11 @@ public class TabBar : Gtk.DrawingArea {
         // Tab title
         draw_tab_title(cr, info, x, y, w, h, is_active);
 
+        // Draw close button if hovering over this tab
+        if (hover_index == index) {
+            draw_tab_close_button(cr, index, x, y, w, h);
+        }
+
         // Draw underline for active tab (full width of tab)
         if (is_active) {
             double underline_y = height - 2;
@@ -243,6 +253,42 @@ public class TabBar : Gtk.DrawingArea {
 
         cr.move_to(text_x, text_y);
         cr.show_text(title);
+    }
+
+    private void draw_tab_close_button(Cairo.Context cr, int index, double tab_x, double tab_y, double tab_w, double tab_h) {
+        // Calculate close button position (right side of tab)
+        double btn_size = TAB_CLOSE_BTN_SIZE;
+        double btn_x = tab_x + tab_w - TAB_CLOSE_BTN_PADDING - btn_size;
+        double btn_y = tab_y + (tab_h - btn_size) / 2;
+        double center_x = btn_x + btn_size / 2;
+        double center_y = btn_y + btn_size / 2;
+
+        // Determine opacity based on hover/pressed state
+        double alpha = 0.5;  // Default
+        if (pressed_close_index == index) {
+            alpha = 1.0;  // Pressed: full opacity
+        } else if (hover_close_index == index) {
+            alpha = 0.8;  // Hover: brighter
+        }
+
+        // Draw circle background
+        cr.set_source_rgba(0.7, 0.7, 0.7, alpha * 0.3);  // Semi-transparent circle
+        cr.arc(center_x, center_y, btn_size / 2, 0, 2 * Math.PI);
+        cr.fill();
+
+        // Draw X mark
+        cr.set_source_rgba(0.7, 0.7, 0.7, alpha);
+        cr.set_line_width(1.5);
+        cr.set_line_cap(Cairo.LineCap.ROUND);
+
+        double x_size = btn_size * 0.4;  // Size of the X
+        cr.move_to(center_x - x_size, center_y - x_size);
+        cr.line_to(center_x + x_size, center_y + x_size);
+        cr.stroke();
+
+        cr.move_to(center_x + x_size, center_y - x_size);
+        cr.line_to(center_x - x_size, center_y + x_size);
+        cr.stroke();
     }
 
     private void draw_new_tab_button(Cairo.Context cr, int width, int height) {
@@ -375,10 +421,12 @@ public class TabBar : Gtk.DrawingArea {
         int old_hover = hover_index;
         int old_hover_control = hover_control;
         bool old_hover_new_tab = hover_new_tab;
+        int old_hover_close = hover_close_index;
 
         hover_index = -1;
         hover_control = -1;
         hover_new_tab = false;
+        hover_close_index = -1;
 
         // Check window control buttons first
         int width = get_width();
@@ -413,22 +461,36 @@ public class TabBar : Gtk.DrawingArea {
                 var info = tab_infos.nth_data((uint)i);
                 if (x >= info.x && x <= info.x + info.width && y <= TAB_HEIGHT + 4) {
                     hover_index = i;
+
+                    // Check if hovering over close button of this tab
+                    double close_btn_size = TAB_CLOSE_BTN_SIZE;
+                    double close_btn_x = info.x + info.width - TAB_CLOSE_BTN_PADDING - close_btn_size;
+                    double close_btn_y = (get_height() - TAB_HEIGHT) + (TAB_HEIGHT - close_btn_size) / 2;
+                    double close_center_x = close_btn_x + close_btn_size / 2;
+                    double close_center_y = close_btn_y + close_btn_size / 2;
+                    double close_hit_radius = close_btn_size / 2 + 2;
+
+                    if (Math.fabs(x - close_center_x) <= close_hit_radius && Math.fabs(y - close_center_y) <= close_hit_radius) {
+                        hover_close_index = i;
+                    }
+
                     break;
                 }
             }
         }
 
         if (old_hover != hover_index || old_hover_control != hover_control ||
-            old_hover_new_tab != hover_new_tab) {
+            old_hover_new_tab != hover_new_tab || old_hover_close != hover_close_index) {
             queue_draw();
         }
     }
 
     private void on_leave() {
-        bool need_redraw = hover_index != -1 || hover_control != -1 || hover_new_tab;
+        bool need_redraw = hover_index != -1 || hover_control != -1 || hover_new_tab || hover_close_index != -1;
         hover_index = -1;
         hover_control = -1;
         hover_new_tab = false;
+        hover_close_index = -1;
         if (need_redraw) {
             queue_draw();
         }
@@ -451,6 +513,13 @@ public class TabBar : Gtk.DrawingArea {
             }
         }
 
+        // Check tab close buttons - set pressed state
+        if (hover_close_index >= 0) {
+            pressed_close_index = hover_close_index;
+            queue_draw();
+            return;
+        }
+
         // Check new tab button - set pressed state
         double new_tab_x = get_new_tab_button_x();
         double new_tab_y = (get_height() - NEW_TAB_BTN_SIZE) / 2;
@@ -465,6 +534,7 @@ public class TabBar : Gtk.DrawingArea {
 
         pressed_control = -1;
         pressed_new_tab = false;
+        pressed_close_index = -1;
     }
 
     private void on_release(int n_press, double x, double y) {
@@ -485,6 +555,16 @@ public class TabBar : Gtk.DrawingArea {
         }
 
         pressed_new_tab = false;
+
+        // Check tab close button - execute action if released on same button
+        if (pressed_close_index >= 0 && hover_close_index == pressed_close_index) {
+            tab_closed(pressed_close_index);
+            pressed_close_index = -1;
+            queue_draw();
+            return;
+        }
+
+        pressed_close_index = -1;
 
         // Check window controls - execute action if released on same button
         int width = get_width();
