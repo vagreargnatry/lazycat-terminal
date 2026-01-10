@@ -465,6 +465,9 @@ public class TerminalWindow : ShadowWindow {
         // Set initial background opacity
         tab.set_background_opacity(background_opacity);
 
+        // Initially not active (will be set active below)
+        tab.is_active_tab = false;
+
         tab.title_changed.connect((title) => {
             tab_bar.update_tab_title(tabs.index(tab), title);
         });
@@ -473,13 +476,28 @@ public class TerminalWindow : ShadowWindow {
             close_tab(tab);
         });
 
+        tab.background_activity.connect(() => {
+            int index = tabs.index(tab);
+            // Only highlight if this is not the active tab
+            if (index >= 0 && index != tab_bar.get_active_index()) {
+                stdout.printf("DEBUG: Setting tab %d as highlighted\n", index);
+                tab_bar.set_tab_highlighted(index, true);
+            }
+        });
+
         tabs.append(tab);
         stack.add_named(tab, "tab_" + tab_counter.to_string());
         tab_bar.add_tab("Terminal " + tab_counter.to_string());
 
-        // Switch to new tab
+        // Switch to new tab and mark it as active
         stack.set_visible_child(tab);
         tab_bar.set_active_tab((int)tabs.length() - 1);
+
+        // Set all tabs as inactive, then set this one as active
+        foreach (var t in tabs) {
+            t.is_active_tab = false;
+        }
+        tab.is_active_tab = true;
 
         tab.grab_focus();
     }
@@ -488,6 +506,17 @@ public class TerminalWindow : ShadowWindow {
         if (index >= 0 && index < tabs.length()) {
             var tab = tabs.nth_data((uint)index);
             stack.set_visible_child(tab);
+
+            // Set all tabs as inactive, then set this one as active
+            foreach (var t in tabs) {
+                t.is_active_tab = false;
+            }
+            tab.is_active_tab = true;
+            stdout.printf("DEBUG: Tab %d is now active\n", index);
+
+            // Clear highlight when switching to this tab
+            tab_bar.clear_tab_highlight(index);
+
             tab.grab_focus();
         }
     }

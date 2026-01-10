@@ -12,6 +12,8 @@ public class TerminalTab : Gtk.Box {
     private double current_opacity = 0.88;
     private HashTable<Vte.Terminal, string> terminal_titles;  // Store title for each terminal
     private HashTable<Vte.Terminal, int> terminal_pids;  // Store child pid for each terminal
+    private HashTable<Vte.Terminal, bool> press_anything;  // Track if user pressed any key in terminal
+    public bool is_active_tab { get; set; default = false; }  // Track if this tab is currently active
 
     private static string? cached_mono_font = null;
     private const int DEFAULT_FONT_SIZE = 14;
@@ -21,6 +23,7 @@ public class TerminalTab : Gtk.Box {
 
     public signal void title_changed(string title);
     public signal void close_requested();
+    public signal void background_activity();  // Signal when background terminal has activity
 
     public TerminalTab(string title) {
         Object(orientation: Gtk.Orientation.VERTICAL, spacing: 0);
@@ -36,6 +39,9 @@ public class TerminalTab : Gtk.Box {
 
         // Initialize terminal pids hash table
         terminal_pids = new HashTable<Vte.Terminal, int>(direct_hash, direct_equal);
+
+        // Initialize press_anything hash table
+        press_anything = new HashTable<Vte.Terminal, bool>(direct_hash, direct_equal);
 
         // Initialize CSS provider for paned styling
         paned_css_provider = new Gtk.CssProvider();
@@ -143,7 +149,23 @@ public class TerminalTab : Gtk.Box {
                     // Update this terminal's title in the hash table
                     terminal_titles.set(terminal, title);
 
-                    // Only update tab title if this is the focused terminal
+                    stdout.printf("DEBUG: Title changed for terminal %p: %s\n", terminal, title);
+                    stdout.printf("DEBUG: is_active_tab=%s, press_anything=%s\n",
+                        is_active_tab.to_string(),
+                        press_anything.get(terminal).to_string());
+
+                    // Check if this tab is in background (not active)
+                    if (!is_active_tab) {
+                        // Check if user has pressed any key
+                        bool? has_pressed = press_anything.get(terminal);
+                        if (has_pressed != null && has_pressed) {
+                            stdout.printf("DEBUG: Emitting background_activity signal!\n");
+                            // Emit signal to highlight the tab
+                            background_activity();
+                        }
+                    }
+
+                    // Update tab title based on focused terminal
                     if (terminal == focused_terminal) {
                         tab_title = title;
                         title_changed(title);
@@ -156,10 +178,23 @@ public class TerminalTab : Gtk.Box {
             close_terminal(terminal);
         });
 
+        // Setup key press tracking
+        var key_controller = new Gtk.EventControllerKey();
+        key_controller.key_pressed.connect((keyval, keycode, state) => {
+            // Set press_anything flag when user presses any key
+            press_anything.set(terminal, true);
+            stdout.printf("DEBUG: Key pressed in terminal %p, press_anything set to true\n", terminal);
+            return false;  // Don't consume the event
+        });
+        terminal.add_controller(key_controller);
+
         // Setup focus tracking using GTK4 EventControllerFocus
         var focus_controller = new Gtk.EventControllerFocus();
         focus_controller.enter.connect(() => {
             focused_terminal = terminal;
+
+            // Reset press_anything flag when terminal gains focus
+            press_anything.set(terminal, false);
 
             // Update tab title when terminal gains focus
             update_tab_title_from_focused_terminal();

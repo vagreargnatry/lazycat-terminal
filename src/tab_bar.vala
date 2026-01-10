@@ -53,11 +53,13 @@ public class TabBar : Gtk.DrawingArea {
         public string title;
         public int x;
         public int width;
+        public bool highlighted;  // Whether tab should be highlighted (background activity)
 
         public TabInfo(string title) {
             this.title = title;
             this.x = 0;
             this.width = 0;
+            this.highlighted = false;
         }
     }
 
@@ -258,10 +260,13 @@ public class TabBar : Gtk.DrawingArea {
         double text_x = x + (w - extents.width) / 2;
         double text_y = y + h / 2 + extents.height / 2 - 2;
 
+        // Choose color based on state
         if (is_active) {
-            cr.set_source_rgba(0.172, 0.655, 0.973, 1.0);  // #2CA7F8
+            cr.set_source_rgba(0.172, 0.655, 0.973, 1.0);  // #2CA7F8 - active tab
+        } else if (info.highlighted) {
+            cr.set_source_rgba(1.0, 0.843, 0.0, 1.0);  // #FFD700 - gold for highlighted (background activity)
         } else {
-            cr.set_source_rgba(0.7, 0.7, 0.7, 1.0);
+            cr.set_source_rgba(0.7, 0.7, 0.7, 1.0);  // Gray for inactive
         }
 
         cr.move_to(text_x, text_y);
@@ -785,6 +790,20 @@ public class TabBar : Gtk.DrawingArea {
     public void set_background_opacity(double opacity) {
         background_opacity = opacity;
         queue_draw();
+    }
+
+    // Set highlight state for a tab (background activity)
+    public void set_tab_highlighted(int index, bool highlighted) {
+        if (index >= 0 && index < tab_infos.length()) {
+            var info = tab_infos.nth_data((uint)index);
+            info.highlighted = highlighted;
+            queue_draw();
+        }
+    }
+
+    // Clear highlight for a tab (when user switches to it)
+    public void clear_tab_highlight(int index) {
+        set_tab_highlighted(index, false);
     }
 
     ~TabBar() {
