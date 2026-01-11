@@ -566,7 +566,6 @@ public class TerminalTab : Gtk.Box {
 
     // Split the focused terminal vertically (left-right)
     public void split_vertical() {
-
         if (focused_terminal == null) {
             return;
         }
@@ -622,6 +621,21 @@ public class TerminalTab : Gtk.Box {
             paned.set_position(alloc.width / 2);
             root_widget = paned;
             append(paned);
+        } else if (parent is Gtk.Overlay) {
+            // The focused terminal is wrapped in an overlay (for search box)
+            var overlay = (Gtk.Overlay)parent;
+
+            // Remove the scrolled window from overlay
+            overlay.set_child(null);
+
+            // Set up the paned with both terminals
+            paned.set_start_child(focused_scrolled);
+            paned.set_end_child(new_scrolled);
+            paned.set_position(alloc.width / 2);
+
+            // Put the paned back into the overlay
+            overlay.set_child(paned);
+            root_widget = paned;
         } else if (parent is Gtk.Paned) {
             // The focused terminal is in a paned
             var parent_paned = (Gtk.Paned)parent;
@@ -640,7 +654,6 @@ public class TerminalTab : Gtk.Box {
             }
 
             paned.set_position(alloc.width / 2);
-        } else {
         }
 
         // Spawn shell in new terminal with same working directory
@@ -717,6 +730,21 @@ public class TerminalTab : Gtk.Box {
             paned.set_position(alloc.height / 2);
             root_widget = paned;
             append(paned);
+        } else if (parent is Gtk.Overlay) {
+            // The focused terminal is wrapped in an overlay (for search box)
+            var overlay = (Gtk.Overlay)parent;
+
+            // Remove the scrolled window from overlay
+            overlay.set_child(null);
+
+            // Set up the paned with both terminals
+            paned.set_start_child(focused_scrolled);
+            paned.set_end_child(new_scrolled);
+            paned.set_position(alloc.height / 2);
+
+            // Put the paned back into the overlay
+            overlay.set_child(paned);
+            root_widget = paned;
         } else if (parent is Gtk.Paned) {
             // The focused terminal is in a paned
             var parent_paned = (Gtk.Paned)parent;
@@ -775,6 +803,8 @@ public class TerminalTab : Gtk.Box {
         // Remove the scrolled window from its parent
         if (parent is Gtk.Box) {
             ((Gtk.Box)parent).remove(scrolled);
+        } else if (parent is Gtk.Overlay) {
+            ((Gtk.Overlay)parent).set_child(null);
         } else if (parent is Gtk.Paned) {
             var paned = (Gtk.Paned)parent;
             if (paned.get_start_child() == scrolled) {
@@ -812,6 +842,8 @@ public class TerminalTab : Gtk.Box {
                 // Remove paned from its parent
                 if (parent is Gtk.Box) {
                     ((Gtk.Box)parent).remove(paned);
+                } else if (parent is Gtk.Overlay) {
+                    ((Gtk.Overlay)parent).set_child(null);
                 } else if (parent is Gtk.Paned) {
                     var parent_paned = (Gtk.Paned)parent;
                     if (parent_paned.get_start_child() == paned) {
@@ -863,6 +895,12 @@ public class TerminalTab : Gtk.Box {
             remove(paned);
             root_widget = child;
             append(child);
+        } else if (parent is Gtk.Overlay) {
+            // Parent is Overlay (for search box)
+            var overlay = (Gtk.Overlay)parent;
+            overlay.set_child(null);
+            overlay.set_child(child);
+            root_widget = child;
         } else if (parent is Gtk.Paned) {
             // Parent is another Paned
             var parent_paned = (Gtk.Paned)parent;

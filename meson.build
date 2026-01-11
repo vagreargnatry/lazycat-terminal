@@ -38,6 +38,7 @@ vala_sources = files(
   'src/confirm_dialog.vala',
   'src/settings_dialog.vala',
   'src/config_manager.vala',
+  'src/keymap.vala',
 )
 
 executable('lazycat-terminal',

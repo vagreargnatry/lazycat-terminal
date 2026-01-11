@@ -78,7 +78,7 @@ public class ConfigManager {
             if (config_file.has_group("shortcut")) {
                 string[] keys = config_file.get_keys("shortcut");
                 foreach (string key in keys) {
-                    string value = config_file.get_string("shortcut", key);
+                    string value = config_file.get_string("shortcut", key).strip();
                     shortcuts.set(key, value);
                 }
             }
@@ -95,67 +95,5 @@ public class ConfigManager {
     // Get shortcut value by name
     public string? get_shortcut(string name) {
         return shortcuts.get(name);
-    }
-
-    // Parse shortcut string into modifiers and key
-    // Returns true if the key event matches the shortcut
-    public bool match_shortcut(string shortcut_name, uint keyval, Gdk.ModifierType state) {
-        string? shortcut = get_shortcut(shortcut_name);
-        if (shortcut == null) return false;
-
-        // Parse shortcut string (e.g., "Ctrl + Shift + c")
-        bool ctrl_needed = false;
-        bool shift_needed = false;
-        bool alt_needed = false;
-        uint target_key = 0;
-
-        string[] parts = shortcut.split("+");
-        foreach (string part in parts) {
-            string trimmed = part.strip().down();
-
-            if (trimmed == "ctrl") {
-                ctrl_needed = true;
-            } else if (trimmed == "shift") {
-                shift_needed = true;
-            } else if (trimmed == "alt") {
-                alt_needed = true;
-            } else {
-                // This is the key part
-                target_key = parse_key_string(trimmed);
-            }
-        }
-
-        // Check if current state matches
-        bool ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0;
-        bool shift = (state & Gdk.ModifierType.SHIFT_MASK) != 0;
-        bool alt = (state & Gdk.ModifierType.ALT_MASK) != 0;
-
-        return (ctrl == ctrl_needed) &&
-               (shift == shift_needed) &&
-               (alt == alt_needed) &&
-               (keyval == target_key);
-    }
-
-    // Convert key string to Gdk.Key value
-    private uint parse_key_string(string key_str) {
-        switch (key_str) {
-            case "c": return Gdk.Key.C;
-            case "v": return Gdk.Key.V;
-            case "f": return Gdk.Key.f;
-            case "a": return Gdk.Key.A;
-            case "t": return Gdk.Key.T;
-            case "w": return Gdk.Key.W;
-            case "j": return Gdk.Key.J;
-            case "h": return Gdk.Key.H;
-            case "k": return Gdk.Key.k;
-            case "l": return Gdk.Key.l;
-            case "q": return Gdk.Key.q;
-            case "e": return Gdk.Key.e;
-            case "=": return Gdk.Key.equal;
-            case "-": return Gdk.Key.minus;
-            case "0": return Gdk.Key.@0;
-            case "tab": return Gdk.Key.Tab;
-            default: return 0;
-        }
     }
 }

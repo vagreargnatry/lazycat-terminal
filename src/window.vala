@@ -261,9 +261,13 @@ public class TerminalWindow : ShadowWindow {
         controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
 
         controller.key_pressed.connect((keyval, keycode, state) => {
-            bool ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0;
-            bool shift = (state & Gdk.ModifierType.SHIFT_MASK) != 0;
-            bool alt = (state & Gdk.ModifierType.ALT_MASK) != 0;
+            // Get the key event name using Keymap
+            string key_name = Keymap.get_keyevent_name(keyval, state);
+
+            // Skip if it's just a modifier key
+            if (key_name == "") {
+                return false;
+            }
 
             // Check if search box is visible in current tab
             bool search_box_visible = false;
@@ -276,12 +280,21 @@ public class TerminalWindow : ShadowWindow {
 
             // If search box is visible, only handle search shortcut to close/reopen it
             // Let other keys pass through to the search box
-            if (search_box_visible && !config.match_shortcut("search", keyval, state)) {
+            if (search_box_visible) {
+                string? search_shortcut = config.get_shortcut("search");
+                if (search_shortcut != null && key_name == search_shortcut) {
+                    if (tabs.length() > 0) {
+                        var tab = tabs.nth_data((uint)tab_bar.get_active_index());
+                        if (tab != null) tab.show_search_box();
+                    }
+                    return true;
+                }
                 return false;  // Let the event propagate to search box
             }
 
             // Copy
-            if (config.match_shortcut("copy", keyval, state)) {
+            string? copy_shortcut = config.get_shortcut("copy");
+            if (copy_shortcut != null && key_name == copy_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.copy_clipboard();
@@ -290,7 +303,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Paste
-            if (config.match_shortcut("paste", keyval, state)) {
+            string? paste_shortcut = config.get_shortcut("paste");
+            if (paste_shortcut != null && key_name == paste_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.paste_clipboard();
@@ -299,7 +313,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Search
-            if (config.match_shortcut("search", keyval, state)) {
+            string? search_shortcut = config.get_shortcut("search");
+            if (search_shortcut != null && key_name == search_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.show_search_box();
@@ -308,25 +323,29 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Zoom in
-            if (config.match_shortcut("zoom_in", keyval, state)) {
+            string? zoom_in_shortcut = config.get_shortcut("zoom_in");
+            if (zoom_in_shortcut != null && key_name == zoom_in_shortcut) {
                 increase_all_font_sizes();
                 return true;
             }
 
             // Zoom out
-            if (config.match_shortcut("zoom_out", keyval, state)) {
+            string? zoom_out_shortcut = config.get_shortcut("zoom_out");
+            if (zoom_out_shortcut != null && key_name == zoom_out_shortcut) {
                 decrease_all_font_sizes();
                 return true;
             }
 
             // Default size
-            if (config.match_shortcut("default_size", keyval, state)) {
+            string? default_size_shortcut = config.get_shortcut("default_size");
+            if (default_size_shortcut != null && key_name == default_size_shortcut) {
                 reset_all_font_sizes();
                 return true;
             }
 
             // Select all
-            if (config.match_shortcut("select_all", keyval, state)) {
+            string? select_all_shortcut = config.get_shortcut("select_all");
+            if (select_all_shortcut != null && key_name == select_all_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.select_all();
@@ -335,13 +354,15 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // New workspace
-            if (config.match_shortcut("new_workspace", keyval, state)) {
+            string? new_workspace_shortcut = config.get_shortcut("new_workspace");
+            if (new_workspace_shortcut != null && key_name == new_workspace_shortcut) {
                 add_new_tab();
                 return true;
             }
 
             // Close workspace
-            if (config.match_shortcut("close_workspace", keyval, state)) {
+            string? close_workspace_shortcut = config.get_shortcut("close_workspace");
+            if (close_workspace_shortcut != null && key_name == close_workspace_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) close_tab(tab);
@@ -350,19 +371,22 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Next workspace
-            if (config.match_shortcut("next_workspace", keyval, state)) {
+            string? next_workspace_shortcut = config.get_shortcut("next_workspace");
+            if (next_workspace_shortcut != null && key_name == next_workspace_shortcut) {
                 cycle_tab(1);
                 return true;
             }
 
             // Previous workspace
-            if (config.match_shortcut("previous_workspace", keyval, state)) {
+            string? previous_workspace_shortcut = config.get_shortcut("previous_workspace");
+            if (previous_workspace_shortcut != null && key_name == previous_workspace_shortcut) {
                 cycle_tab(-1);
                 return true;
             }
 
             // Vertical split
-            if (config.match_shortcut("vertical_split", keyval, state)) {
+            string? vertical_split_shortcut = config.get_shortcut("vertical_split");
+            if (vertical_split_shortcut != null && key_name == vertical_split_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) {
@@ -373,7 +397,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Horizontal split
-            if (config.match_shortcut("horizontal_split", keyval, state)) {
+            string? horizontal_split_shortcut = config.get_shortcut("horizontal_split");
+            if (horizontal_split_shortcut != null && key_name == horizontal_split_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) {
@@ -384,7 +409,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Select upper window
-            if (config.match_shortcut("select_upper_window", keyval, state)) {
+            string? select_upper_window_shortcut = config.get_shortcut("select_upper_window");
+            if (select_upper_window_shortcut != null && key_name == select_upper_window_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.select_up_terminal();
@@ -393,7 +419,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Select lower window
-            if (config.match_shortcut("select_lower_window", keyval, state)) {
+            string? select_lower_window_shortcut = config.get_shortcut("select_lower_window");
+            if (select_lower_window_shortcut != null && key_name == select_lower_window_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.select_down_terminal();
@@ -402,7 +429,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Select left window
-            if (config.match_shortcut("select_left_window", keyval, state)) {
+            string? select_left_window_shortcut = config.get_shortcut("select_left_window");
+            if (select_left_window_shortcut != null && key_name == select_left_window_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.select_left_terminal();
@@ -411,7 +439,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Select right window
-            if (config.match_shortcut("select_right_window", keyval, state)) {
+            string? select_right_window_shortcut = config.get_shortcut("select_right_window");
+            if (select_right_window_shortcut != null && key_name == select_right_window_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.select_right_terminal();
@@ -420,7 +449,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Close window
-            if (config.match_shortcut("close_window", keyval, state)) {
+            string? close_window_shortcut = config.get_shortcut("close_window");
+            if (close_window_shortcut != null && key_name == close_window_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.close_focused_terminal();
@@ -429,7 +459,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Close other windows
-            if (config.match_shortcut("close_other_windows", keyval, state)) {
+            string? close_other_windows_shortcut = config.get_shortcut("close_other_windows");
+            if (close_other_windows_shortcut != null && key_name == close_other_windows_shortcut) {
                 if (tabs.length() > 0) {
                     var tab = tabs.nth_data((uint)tab_bar.get_active_index());
                     if (tab != null) tab.close_other_terminals();
@@ -438,6 +469,8 @@ public class TerminalWindow : ShadowWindow {
             }
 
             // Legacy support for Ctrl+Shift+E (settings dialog) - not in config
+            bool ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0;
+            bool shift = (state & Gdk.ModifierType.SHIFT_MASK) != 0;
             if (ctrl && shift && (keyval == Gdk.Key.E || keyval == Gdk.Key.e)) {
                 show_settings_dialog();
                 return true;
