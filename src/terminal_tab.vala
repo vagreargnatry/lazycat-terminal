@@ -189,6 +189,9 @@ public class TerminalTab : Gtk.Box {
         terminal.set_vexpand(true);
         terminal.set_hexpand(true);
 
+        // Enable hyperlink detection
+        setup_hyperlink_detection(terminal);
+
         // Connect signals - use termprop_changed for title updates (VTE 0.78+)
         terminal.termprop_changed.connect((prop_name) => {
             if (prop_name == "xterm.title") {
@@ -262,6 +265,110 @@ public class TerminalTab : Gtk.Box {
         terminal_list.append(terminal);
 
         return terminal;
+    }
+
+    private void setup_hyperlink_detection(Vte.Terminal terminal) {
+        // Regular expression to match URLs (http, https, ftp, file)
+        string url_regex = "(https?|ftp|file)://[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]";
+
+        int regex_tag = -1;
+        try {
+            // Create regex for URL matching
+            var regex = new Vte.Regex.for_match(url_regex, (ssize_t)url_regex.length, 0);
+            regex_tag = terminal.match_add_regex(regex, 0);
+        } catch (Error e) {
+            stderr.printf("Error setting up hyperlink regex: %s\n", e.message);
+            return;
+        }
+
+        // Track current hover URL and cursor
+        string? current_hover_url = null;
+        Gdk.Cursor? default_cursor = null;
+        Gdk.Cursor? hand_cursor = null;
+
+        // Mouse motion controller for hover detection
+        var motion_controller = new Gtk.EventControllerMotion();
+        motion_controller.motion.connect((x, y) => {
+            // Convert pixel coordinates to character cell coordinates
+            double char_width = terminal.get_char_width();
+            double char_height = terminal.get_char_height();
+
+            long column = (long)(x / char_width);
+            long row = (long)(y / char_height);
+
+            // Check if mouse is over a URL using character coordinates
+            int tag;
+            string? url = terminal.match_check(column, row, out tag);
+
+            // Update cursor and underline based on hover state
+            if (url != null && url != current_hover_url) {
+                // Mouse entered a URL
+                current_hover_url = url;
+
+                // Set hand cursor
+                if (hand_cursor == null) {
+                    hand_cursor = new Gdk.Cursor.from_name("pointer", null);
+                }
+                terminal.set_cursor(hand_cursor);
+            } else if (url == null && current_hover_url != null) {
+                // Mouse left URL
+                current_hover_url = null;
+
+                // Restore default cursor
+                if (default_cursor == null) {
+                    default_cursor = new Gdk.Cursor.from_name("text", null);
+                }
+                terminal.set_cursor(default_cursor);
+            }
+        });
+        terminal.add_controller(motion_controller);
+
+        // Click gesture for Ctrl+Click to open URL
+        var click_gesture = new Gtk.GestureClick();
+        click_gesture.set_button(1);  // Left button
+        click_gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+        click_gesture.pressed.connect((n_press, x, y) => {
+            var event = click_gesture.get_current_event();
+            if (event != null) {
+                var state = event.get_modifier_state();
+                bool ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0;
+
+                stderr.printf("Click detected: ctrl=%s, x=%f, y=%f\n", ctrl.to_string(), x, y);
+
+                if (ctrl) {
+                    // Convert pixel coordinates to character cell coordinates
+                    double char_width = terminal.get_char_width();
+                    double char_height = terminal.get_char_height();
+
+                    long column = (long)(x / char_width);
+                    long row = (long)(y / char_height);
+
+                    stderr.printf("Character position: column=%ld, row=%ld\n", column, row);
+
+                    // Check if clicked on a URL using character coordinates
+                    int tag;
+                    string? url = terminal.match_check(column, row, out tag);
+
+                    stderr.printf("URL at click position: %s\n", url ?? "null");
+
+                    if (url != null) {
+                        // Open URL in default browser
+                        stderr.printf("Opening URL: %s\n", url);
+                        open_url(url);
+                    }
+                }
+            }
+        });
+        terminal.add_controller(click_gesture);
+    }
+
+    private void open_url(string url) {
+        try {
+            // Use GLib.AppInfo to open URL with default application
+            AppInfo.launch_default_for_uri(url, null);
+        } catch (Error e) {
+            stderr.printf("Error opening URL %s: %s\n", url, e.message);
+        }
     }
 
     private Gtk.ScrolledWindow create_scrolled_window(Vte.Terminal terminal) {
