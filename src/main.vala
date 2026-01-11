@@ -7,7 +7,7 @@ public class LazyCatTerminal : Gtk.Application {
     public LazyCatTerminal() {
         Object(
             application_id: "com.lazycat.terminal",
-            flags: ApplicationFlags.HANDLES_COMMAND_LINE
+            flags: ApplicationFlags.HANDLES_COMMAND_LINE | ApplicationFlags.NON_UNIQUE
         );
     }
 

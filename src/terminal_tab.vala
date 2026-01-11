@@ -823,16 +823,17 @@ public class TerminalTab : Gtk.Box {
             return null;
         }
 
-        // Use termprop API (VTE 0.78+)
-        size_t length;
-        string? uri = focused_terminal.get_termprop_string("vte.xterm.current-directory-uri", out length);
-        if (uri == null || length == 0) {
-            return null;
-        }
-
-        // Convert URI to path (e.g., "file:///home/user" -> "/home/user")
-        if (uri.has_prefix("file://")) {
-            return uri.substring(7);
+        if (focused_terminal.get_pty() != null) {
+            int pty_fd = focused_terminal.get_pty().fd;
+            int fpid = Posix.tcgetpgrp(pty_fd);
+            if (fpid > 0) {
+                try {
+                    string cwd = FileUtils.read_link("/proc/%d/cwd".printf(fpid));
+                    return cwd;
+                } catch (Error e) {
+                    stderr.printf("Parse cwd of %d failed: %s\n", fpid, e.message);
+                }
+            }
         }
 
         return null;
