@@ -84,8 +84,13 @@ public class TerminalTab : Gtk.Box {
         // Initialize press_anything hash table
         press_anything = new HashTable<Vte.Terminal, bool>(direct_hash, direct_equal);
 
-        // Initialize CSS provider for paned styling
+        // Initialize CSS provider for paned styling and add to global display
         paned_css_provider = new Gtk.CssProvider();
+        StyleHelper.add_provider_for_display(
+            Gdk.Display.get_default(),
+            paned_css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
         update_paned_style();
 
         // Create initial terminal with current directory as initial title
@@ -288,16 +293,9 @@ public class TerminalTab : Gtk.Box {
         // Mouse motion controller for hover detection
         var motion_controller = new Gtk.EventControllerMotion();
         motion_controller.motion.connect((x, y) => {
-            // Convert pixel coordinates to character cell coordinates
-            double char_width = terminal.get_char_width();
-            double char_height = terminal.get_char_height();
-
-            long column = (long)(x / char_width);
-            long row = (long)(y / char_height);
-
-            // Check if mouse is over a URL using character coordinates
+            // Check if mouse is over a URL using pixel coordinates
             int tag;
-            string? url = terminal.match_check(column, row, out tag);
+            string? url = terminal.check_match_at(x, y, out tag);
 
             // Update cursor and underline based on hover state
             if (url != null && url != current_hover_url) {
@@ -333,16 +331,9 @@ public class TerminalTab : Gtk.Box {
                 bool ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0;
 
                 if (ctrl) {
-                    // Convert pixel coordinates to character cell coordinates
-                    double char_width = terminal.get_char_width();
-                    double char_height = terminal.get_char_height();
-
-                    long column = (long)(x / char_width);
-                    long row = (long)(y / char_height);
-
-                    // Check if clicked on a URL using character coordinates
+                    // Check if clicked on a URL using pixel coordinates
                     int tag;
-                    string? url = terminal.match_check(column, row, out tag);
+                    string? url = terminal.check_match_at(x, y, out tag);
 
                     if (url != null) {
                         // Open URL in default browser
@@ -456,12 +447,29 @@ public class TerminalTab : Gtk.Box {
             var paned = (Gtk.Paned)widget;
             var start_child = paned.get_start_child();
             var end_child = paned.get_end_child();
-            if (start_child != null) foreach_terminal(start_child, callback);
-            if (end_child != null) foreach_terminal(end_child, callback);
+            if (start_child != null) foreach_terminal_internal(start_child, callback);
+            if (end_child != null) foreach_terminal_internal(end_child, callback);
         } else if (widget is Gtk.ScrolledWindow) {
             var scrolled = (Gtk.ScrolledWindow)widget;
             var child = scrolled.get_child();
-            if (child != null) foreach_terminal(child, callback);
+            if (child != null) foreach_terminal_internal(child, callback);
+        }
+    }
+
+    // Internal recursive helper that doesn't take ownership of delegate
+    private void foreach_terminal_internal(Gtk.Widget widget, TerminalCallback callback) {
+        if (widget is Vte.Terminal) {
+            callback((Vte.Terminal)widget);
+        } else if (widget is Gtk.Paned) {
+            var paned = (Gtk.Paned)widget;
+            var start_child = paned.get_start_child();
+            var end_child = paned.get_end_child();
+            if (start_child != null) foreach_terminal_internal(start_child, callback);
+            if (end_child != null) foreach_terminal_internal(end_child, callback);
+        } else if (widget is Gtk.ScrolledWindow) {
+            var scrolled = (Gtk.ScrolledWindow)widget;
+            var child = scrolled.get_child();
+            if (child != null) foreach_terminal_internal(child, callback);
         }
     }
 
@@ -492,8 +500,10 @@ public class TerminalTab : Gtk.Box {
 
     // Get working directory of a specific terminal
     private string? get_terminal_working_directory(Vte.Terminal terminal) {
-        string? uri = terminal.get_current_directory_uri();
-        if (uri == null) {
+        // Use termprop API (VTE 0.78+)
+        size_t length;
+        string? uri = terminal.get_termprop_string("vte.xterm.current-directory-uri", out length);
+        if (uri == null || length == 0) {
             return null;
         }
 
@@ -573,14 +583,8 @@ public class TerminalTab : Gtk.Box {
         if (widget is Gtk.Paned) {
             var paned = (Gtk.Paned)widget;
 
-            // Add CSS class
+            // Add CSS class (provider is already added globally)
             paned.add_css_class("terminal-paned");
-
-            // Add CSS provider
-            paned.get_style_context().add_provider(
-                paned_css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            );
 
             // Recursively apply to children
             var start_child = paned.get_start_child();
@@ -650,8 +654,10 @@ public class TerminalTab : Gtk.Box {
             return null;
         }
 
-        string? uri = focused_terminal.get_current_directory_uri();
-        if (uri == null) {
+        // Use termprop API (VTE 0.78+)
+        size_t length;
+        string? uri = focused_terminal.get_termprop_string("vte.xterm.current-directory-uri", out length);
+        if (uri == null || length == 0) {
             return null;
         }
 
@@ -693,9 +699,8 @@ public class TerminalTab : Gtk.Box {
             return;
         }
 
-        // Get allocation BEFORE removing from parent
-        Gtk.Allocation alloc;
-        focused_scrolled.get_allocation(out alloc);
+        // Get dimensions BEFORE removing from parent
+        int scrolled_width = focused_scrolled.get_width();
 
         Gtk.Widget? parent = focused_scrolled.get_parent();
 
@@ -717,7 +722,7 @@ public class TerminalTab : Gtk.Box {
             remove(focused_scrolled);
             paned.set_start_child(focused_scrolled);
             paned.set_end_child(new_scrolled);
-            paned.set_position(alloc.width / 2);
+            paned.set_position(scrolled_width / 2);
             root_widget = paned;
             append(paned);
         } else if (parent is Gtk.Overlay) {
@@ -730,7 +735,7 @@ public class TerminalTab : Gtk.Box {
             // Set up the paned with both terminals
             paned.set_start_child(focused_scrolled);
             paned.set_end_child(new_scrolled);
-            paned.set_position(alloc.width / 2);
+            paned.set_position(scrolled_width / 2);
 
             // Put the paned back into the overlay
             overlay.set_child(paned);
@@ -752,7 +757,7 @@ public class TerminalTab : Gtk.Box {
                 parent_paned.set_end_child(paned);
             }
 
-            paned.set_position(alloc.width / 2);
+            paned.set_position(scrolled_width / 2);
         }
 
         // Spawn shell in new terminal with same working directory
@@ -802,9 +807,8 @@ public class TerminalTab : Gtk.Box {
             return;
         }
 
-        // Get allocation BEFORE removing from parent
-        Gtk.Allocation alloc;
-        focused_scrolled.get_allocation(out alloc);
+        // Get dimensions BEFORE removing from parent
+        int scrolled_height = focused_scrolled.get_height();
 
         Gtk.Widget? parent = focused_scrolled.get_parent();
 
@@ -826,7 +830,7 @@ public class TerminalTab : Gtk.Box {
             remove(focused_scrolled);
             paned.set_start_child(focused_scrolled);
             paned.set_end_child(new_scrolled);
-            paned.set_position(alloc.height / 2);
+            paned.set_position(scrolled_height / 2);
             root_widget = paned;
             append(paned);
         } else if (parent is Gtk.Overlay) {
@@ -839,7 +843,7 @@ public class TerminalTab : Gtk.Box {
             // Set up the paned with both terminals
             paned.set_start_child(focused_scrolled);
             paned.set_end_child(new_scrolled);
-            paned.set_position(alloc.height / 2);
+            paned.set_position(scrolled_height / 2);
 
             // Put the paned back into the overlay
             overlay.set_child(paned);
@@ -861,7 +865,7 @@ public class TerminalTab : Gtk.Box {
                 parent_paned.set_end_child(paned);
             }
 
-            paned.set_position(alloc.height / 2);
+            paned.set_position(scrolled_height / 2);
         } else {
         }
 
@@ -1042,17 +1046,20 @@ public class TerminalTab : Gtk.Box {
 
     // Get absolute position of a widget relative to this TerminalTab
     private void get_widget_position(Gtk.Widget widget, out int x, out int y, out int width, out int height) {
-        Gtk.Allocation alloc;
-        widget.get_allocation(out alloc);
+        // Get widget dimensions
+        width = widget.get_width();
+        height = widget.get_height();
 
-        // Translate coordinates to TerminalTab's coordinate system
-        double widget_x, widget_y;
-        widget.translate_coordinates(this, 0, 0, out widget_x, out widget_y);
-
-        x = (int)widget_x;
-        y = (int)widget_y;
-        width = alloc.width;
-        height = alloc.height;
+        // Translate coordinates to TerminalTab's coordinate system using compute_point
+        Graphene.Point src_point = Graphene.Point() { x = 0, y = 0 };
+        Graphene.Point dest_point;
+        if (widget.compute_point(this, src_point, out dest_point)) {
+            x = (int)dest_point.x;
+            y = (int)dest_point.y;
+        } else {
+            x = 0;
+            y = 0;
+        }
     }
 
     // Find terminals that intersect horizontally (for left/right selection)
@@ -1357,9 +1364,6 @@ public class TerminalTab : Gtk.Box {
         var css_provider = new Gtk.CssProvider();
         double paned_opacity = double.max(0.6, double.min(1.0, current_opacity + 0.3));
 
-        // Get separator color (same as paned separator)
-        string separator_color = is_color_dark(background_color) ? "#eee" : "#111";
-
         // Calculate RGBA values for separator color with 0.05 opacity
         string border_rgba = is_color_dark(background_color) ?
             "rgba(238, 238, 238, 0.05)" : "rgba(17, 17, 17, 0.05)";
@@ -1471,12 +1475,9 @@ public class TerminalTab : Gtk.Box {
         """;
         css_provider.load_from_string(css);
 
-        search_box.get_style_context().add_provider(
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        );
-
-        search_entry.get_style_context().add_provider(
+        // Add provider to global display (CSS classes already applied during creation)
+        StyleHelper.add_provider_for_display(
+            Gdk.Display.get_default(),
             css_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         );

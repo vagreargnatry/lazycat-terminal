@@ -115,7 +115,7 @@ public class ConfirmDialog : Gtk.Window {
 
         css_provider.load_from_string(css);
 
-        Gtk.StyleContext.add_provider_for_display(
+        StyleHelper.add_provider_for_display(
             Gdk.Display.get_default(),
             css_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION

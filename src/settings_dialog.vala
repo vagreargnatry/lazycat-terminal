@@ -140,7 +140,7 @@ public class SettingsDialog : Gtk.Window {
 
         css_provider.load_from_string(css);
 
-        Gtk.StyleContext.add_provider_for_display(
+        StyleHelper.add_provider_for_display(
             Gdk.Display.get_default(),
             css_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
@@ -387,11 +387,10 @@ public class SettingsDialog : Gtk.Window {
                 string theme = theme_list.get_selected_theme();
                 theme_changed(theme);
                 break;
+            case FocusTarget.TRANSPARENCY_SLIDER:
+                opacity_changed(transparency_slider.get_value());
+                break;
         }
-    }
-
-    private void apply_opacity() {
-        opacity_changed(transparency_slider.get_value());
     }
 
     // Update dialog colors when theme changes
@@ -457,11 +456,6 @@ private abstract class SettingsListWidget : Gtk.DrawingArea {
 
     public void set_focused(bool focused) {
         is_focused = focused;
-        queue_draw();
-    }
-
-    public void update_foreground_color(Gdk.RGBA new_fg_color) {
-        foreground_color = new_fg_color;
         queue_draw();
     }
 
@@ -686,14 +680,6 @@ private class FontSizeListWidget : SettingsListWidget {
     public void set_selected_size(int size) {
         if (size >= MIN_SIZE && size <= MAX_SIZE) {
             selected_index = size - MIN_SIZE;
-            queue_draw();
-        }
-    }
-
-    // Set selected size by index
-    public void set_selected_index(int index) {
-        if (index >= 0 && index < get_item_count()) {
-            selected_index = index;
             queue_draw();
         }
     }

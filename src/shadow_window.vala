@@ -146,7 +146,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
             }
         """);
 
-        Gtk.StyleContext.add_provider_for_display(
+        StyleHelper.add_provider_for_display(
             Gdk.Display.get_default(),
             provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
