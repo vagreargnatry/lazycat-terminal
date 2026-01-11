@@ -98,7 +98,7 @@ public class SettingsDialog : Gtk.Window {
     }
 
     private void setup_window() {
-        set_default_size(640 + SHADOW_SIZE * 2, 480 + SHADOW_SIZE * 2);
+        set_default_size(828 + SHADOW_SIZE * 2, 576 + SHADOW_SIZE * 2);  // 120% of original 640x480 + 60px width
         set_decorated(false);
         set_resizable(false);
 
@@ -179,19 +179,19 @@ public class SettingsDialog : Gtk.Window {
         // Font list (1.5x width)
         font_list = new FontListWidget(foreground_color, background_color);
         font_list.set_hexpand(true);
-        font_list.set_size_request(300, 300);  // Wider
+        font_list.set_size_request(330, 300);  // Wider - increased by 30px
         lists_box.append(font_list);
 
         // Font size list (1/3 width)
         font_size_list = new FontSizeListWidget(foreground_color, background_color);
         font_size_list.set_hexpand(false);
-        font_size_list.set_size_request(100, 300);  // Narrower
+        font_size_list.set_size_request(80, 300);  // 50% of original width
         lists_box.append(font_size_list);
 
         // Theme list (normal width)
         theme_list = new ThemeListWidget(foreground_color, background_color);
         theme_list.set_hexpand(true);
-        theme_list.set_size_request(200, 300);
+        theme_list.set_size_request(260, 300);  // Increased by 30px
         lists_box.append(theme_list);
 
         main_box.append(lists_box);
@@ -649,9 +649,14 @@ private class FontListWidget : SettingsListWidget {
 
             // Set the font face to the actual font name so it renders in its own style
             cr.select_font_face(fonts[i], Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
-            cr.set_font_size(12);
+            cr.set_font_size(16);  // 150% of original 12
 
-            cr.move_to(PADDING + 5, y + ITEM_HEIGHT / 2 + 5);
+            // Calculate text width for centering
+            Cairo.TextExtents extents;
+            cr.text_extents(fonts[i], out extents);
+            double text_x = 10;
+
+            cr.move_to(text_x, y + ITEM_HEIGHT / 2 + 5);
             cr.show_text(fonts[i]);
             y += ITEM_HEIGHT;
         }
@@ -722,9 +727,21 @@ private class FontSizeListWidget : SettingsListWidget {
                 foreground_color.blue,
                 1.0
             );
+
+            // Set font size - 150% increase
+            cr.select_font_face("monospace", Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
+            cr.set_font_size(18);  // 150% of default
+
             int size = MIN_SIZE + i;
-            cr.move_to(PADDING + 5, y + ITEM_HEIGHT / 2 + 5);
-            cr.show_text(size.to_string());
+            string size_text = size.to_string();
+
+            // Calculate text width for centering
+            Cairo.TextExtents extents;
+            cr.text_extents(size_text, out extents);
+            double text_x = (width - extents.width) / 2;
+
+            cr.move_to(text_x, y + ITEM_HEIGHT / 2 + 5);
+            cr.show_text(size_text);
             y += ITEM_HEIGHT;
         }
     }
@@ -956,7 +973,7 @@ private class ThemeListWidget : SettingsListWidget {
 
             // First line: "lazycat@terminal:~/Theme$ _"
             cr.select_font_face("monospace", Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
-            cr.set_font_size(11);
+            cr.set_font_size(16);  // 130% of original 11
 
             double text_x = x + 8;
             double text_y = y + 20;
