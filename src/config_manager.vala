@@ -9,6 +9,7 @@ public class ConfigManager {
     public double opacity { get; private set; }
     public string font { get; private set; }
     public int font_size { get; private set; }
+    public bool hide_tab_bar { get; private set; }
 
     // Shortcut mappings
     private HashTable<string, string> shortcuts;
@@ -90,12 +91,19 @@ public class ConfigManager {
                 opacity = config_file.get_double("general", "opacity");
                 font = config_file.get_string("general", "font");
                 font_size = config_file.get_integer("general", "font_size");
+                // Load hide_tab_bar with default false if not present
+                try {
+                    hide_tab_bar = config_file.get_boolean("general", "hide_tab_bar");
+                } catch (KeyFileError e) {
+                    hide_tab_bar = false;
+                }
             } else {
                 // Set defaults if general section is missing
                 theme = "default";
                 opacity = 0.88;
                 font = "Hack";
                 font_size = 13;
+                hide_tab_bar = false;
             }
 
             // Load shortcuts
@@ -113,6 +121,7 @@ public class ConfigManager {
             opacity = 0.88;
             font = "Hack";
             font_size = 13;
+            hide_tab_bar = false;
         }
     }
 
@@ -146,6 +155,12 @@ public class ConfigManager {
         save_config();
     }
 
+    // Update hide_tab_bar setting and save to config file
+    public void update_hide_tab_bar(bool new_hide_tab_bar) {
+        hide_tab_bar = new_hide_tab_bar;
+        save_config();
+    }
+
     // Save current configuration to file
     private void save_config() {
         try {
@@ -155,6 +170,7 @@ public class ConfigManager {
             config_file.set_string("general", "opacity", "%.2f".printf(opacity));
             config_file.set_string("general", "font", font);
             config_file.set_integer("general", "font_size", font_size);
+            config_file.set_boolean("general", "hide_tab_bar", hide_tab_bar);
 
             // Save to file
             string data = config_file.to_data();
