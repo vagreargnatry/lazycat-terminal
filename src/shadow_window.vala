@@ -105,6 +105,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
             .shadow-container.snap-left {
                 box-shadow: 8px 4px 12px rgba(0, 0, 0, 0.35);
+                border-radius: 0;
             }
             .shadow-container.snap-left.unfocused {
                 box-shadow: 6px 2px 8px rgba(0, 0, 0, 0.18);
@@ -112,6 +113,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
             .shadow-container.snap-right {
                 box-shadow: -8px 4px 12px rgba(0, 0, 0, 0.35);
+                border-radius: 0;
             }
             .shadow-container.snap-right.unfocused {
                 box-shadow: -6px 2px 8px rgba(0, 0, 0, 0.18);
@@ -119,6 +121,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
             .shadow-container.snap-top-left {
                 box-shadow: 8px 8px 12px rgba(0, 0, 0, 0.35);
+                border-radius: 0;
             }
             .shadow-container.snap-top-left.unfocused {
                 box-shadow: 6px 6px 8px rgba(0, 0, 0, 0.18);
@@ -126,6 +129,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
             .shadow-container.snap-top-right {
                 box-shadow: -8px 8px 12px rgba(0, 0, 0, 0.35);
+                border-radius: 0;
             }
             .shadow-container.snap-top-right.unfocused {
                 box-shadow: -6px 6px 8px rgba(0, 0, 0, 0.18);
@@ -133,6 +137,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
             .shadow-container.snap-bottom-left {
                 box-shadow: 8px -4px 12px rgba(0, 0, 0, 0.35);
+                border-radius: 0;
             }
             .shadow-container.snap-bottom-left.unfocused {
                 box-shadow: 6px -2px 8px rgba(0, 0, 0, 0.18);
@@ -140,6 +145,7 @@ public class ShadowWindow : Gtk.ApplicationWindow {
 
             .shadow-container.snap-bottom-right {
                 box-shadow: -8px -4px 12px rgba(0, 0, 0, 0.35);
+                border-radius: 0;
             }
             .shadow-container.snap-bottom-right.unfocused {
                 box-shadow: -6px -2px 8px rgba(0, 0, 0, 0.18);
@@ -299,11 +305,61 @@ public class ShadowWindow : Gtk.ApplicationWindow {
         int left = content_box.get_margin_start();
         int right = content_box.get_margin_end();
 
-        var region = new Cairo.Region.rectangle({
-            left, top,
-            width - left - right,
-            height - top - bottom
-        });
+        int content_width = width - left - right;
+        int content_height = height - top - bottom;
+
+        Cairo.Region region;
+
+        // Check if window is maximized, fullscreen, or snapped
+        bool is_square_corners = snap_position != WindowSnapPosition.NONE;
+
+        var toplevel = surface as Gdk.Toplevel;
+        if (toplevel != null) {
+            var state = toplevel.get_state();
+            if ((Gdk.ToplevelState.MAXIMIZED in state) ||
+                (Gdk.ToplevelState.FULLSCREEN in state) ||
+                (Gdk.ToplevelState.TILED in state)) {
+                is_square_corners = true;
+            }
+        }
+
+        if (is_square_corners) {
+            // Square corners - simple rectangle
+            region = new Cairo.Region.rectangle({
+                left, top,
+                content_width,
+                content_height
+            });
+        } else {
+            // Rounded corners - create region with rounded corners
+            // Match the CSS border-radius of 6px
+            int corner_radius = 6;
+
+            // Create the rounded rectangle by combining rectangles
+            // Main center rectangle (full width, reduced height for corners)
+            region = new Cairo.Region.rectangle({
+                left,
+                top + corner_radius,
+                content_width,
+                content_height - corner_radius * 2
+            });
+
+            // Top rectangle (reduced width for corners)
+            region.union_rectangle({
+                left + corner_radius,
+                top,
+                content_width - corner_radius * 2,
+                corner_radius
+            });
+
+            // Bottom rectangle (reduced width for corners)
+            region.union_rectangle({
+                left + corner_radius,
+                top + content_height - corner_radius,
+                content_width - corner_radius * 2,
+                corner_radius
+            });
+        }
 
         surface.set_input_region(region);
     }

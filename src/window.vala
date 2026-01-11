@@ -699,6 +699,9 @@ public class TerminalWindow : ShadowWindow {
         notify["default-width"].connect(detect_snap_position);
         notify["default-height"].connect(detect_snap_position);
 
+        // Monitor maximized state changes
+        notify["maximized"].connect(detect_snap_position);
+
         // Use map signal for initial detection
         map.connect(() => {
             detect_snap_position();
