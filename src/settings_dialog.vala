@@ -765,7 +765,7 @@ private class ThemeListWidget : SettingsListWidget {
         var colors_list = new ThemeColors[0];
 
         try {
-            var dir = File.new_for_path("./theme");
+            var dir = File.new_for_path(Path.build_filename(ConfigManager.data_dir, "theme"));
             var enumerator = dir.enumerate_children(
                 FileAttribute.STANDARD_NAME,
                 FileQueryInfoFlags.NONE
@@ -778,7 +778,7 @@ private class ThemeListWidget : SettingsListWidget {
                     theme_list += name;
 
                     // Load theme colors
-                    var theme_file = File.new_for_path("./theme/" + name);
+                    var theme_file = File.new_for_path(ConfigManager.get_theme_path(name));
                     var colors = load_theme_colors(theme_file);
                     colors_list += colors;
                 }

@@ -13,6 +13,30 @@ public class ConfigManager {
     // Shortcut mappings
     private HashTable<string, string> shortcuts;
 
+    // Data directory (where themes and default config are located)
+    private static string? _data_dir = null;
+    public static string data_dir {
+        get {
+            if (_data_dir == null) {
+                // First check current directory (for development)
+                string local_path = Environment.get_current_dir();
+                var local_theme = File.new_for_path(Path.build_filename(local_path, "theme"));
+                if (local_theme.query_exists()) {
+                    _data_dir = local_path;
+                } else {
+                    // Use system installation path
+                    _data_dir = "/usr/share/lazycat-terminal";
+                }
+            }
+            return _data_dir;
+        }
+    }
+
+    // Get theme file path
+    public static string get_theme_path(string theme_name) {
+        return Path.build_filename(data_dir, "theme", theme_name);
+    }
+
     public ConfigManager() {
         config_file = new KeyFile();
         shortcuts = new HashTable<string, string>(str_hash, str_equal);
@@ -41,8 +65,8 @@ public class ConfigManager {
                     dir.make_directory_with_parents();
                 }
 
-                // Copy config.conf from current directory to ~/.config/lazycat-terminal/
-                string source_path = Path.build_filename(Environment.get_current_dir(), "config.conf");
+                // Copy config.conf from data directory to ~/.config/lazycat-terminal/
+                string source_path = Path.build_filename(data_dir, "config.conf");
                 var source_file = File.new_for_path(source_path);
 
                 if (source_file.query_exists()) {

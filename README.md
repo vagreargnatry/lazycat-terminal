@@ -120,7 +120,7 @@ sudo dnf install vala meson gtk4-devel vte291-gtk4-devel
 #### 编译源码
 ```bash
 # 克隆仓库
-git clone https://github.com/user/lazycat-terminal.git
+git clone https://github.com/manateelazycat/lazycat-terminal.git
 cd lazycat-terminal
 
 # 配置构建目录

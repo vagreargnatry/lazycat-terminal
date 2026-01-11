@@ -1976,7 +1976,7 @@ public class TerminalTab : Gtk.Box {
     // Apply theme to all terminals in this tab
     public void apply_theme(string theme_name) {
         try {
-            var theme_file = File.new_for_path("./theme/" + theme_name);
+            var theme_file = File.new_for_path(ConfigManager.get_theme_path(theme_name));
             var key_file = new KeyFile();
             key_file.load_from_file(theme_file.get_path(), KeyFileFlags.NONE);
 

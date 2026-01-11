@@ -138,7 +138,7 @@ public class TerminalWindow : ShadowWindow {
 
         // Load and set active tab color from theme
         try {
-            var theme_file = File.new_for_path("./theme/" + config.theme);
+            var theme_file = File.new_for_path(ConfigManager.get_theme_path(config.theme));
             var key_file = new KeyFile();
             key_file.load_from_file(theme_file.get_path(), KeyFileFlags.NONE);
 
@@ -891,7 +891,7 @@ public class TerminalWindow : ShadowWindow {
     // Load theme colors (background and tab colors) without applying to existing tabs
     private void load_theme_colors(string theme_name) {
         try {
-            var theme_file = File.new_for_path("./theme/" + theme_name);
+            var theme_file = File.new_for_path(ConfigManager.get_theme_path(theme_name));
             var key_file = new KeyFile();
             key_file.load_from_file(theme_file.get_path(), KeyFileFlags.NONE);
 
