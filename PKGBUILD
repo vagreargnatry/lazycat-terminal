@@ -1,6 +1,6 @@
 # Maintainer: Andy Stewart <lazycat.manatee@gmail.com>
 pkgname=lazycat-terminal
-pkgver=0.1.0
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="A high-performance terminal emulator with tabs, splits and transparent background"
 arch=('x86_64')

@@ -10,6 +10,7 @@ public class ConfigManager {
     public string font { get; private set; }
     public int font_size { get; private set; }
     public bool hide_tab_bar { get; private set; }
+    public bool start_maximized { get; private set; }
 
     // Shortcut mappings
     private HashTable<string, string> shortcuts;
@@ -97,6 +98,13 @@ public class ConfigManager {
                 } catch (KeyFileError e) {
                     hide_tab_bar = false;
                 }
+                
+                // Load start_maximized with default false if not present
+                try {
+                    start_maximized = config_file.get_boolean("general", "start_maximized");
+                } catch (KeyFileError e) {
+                    start_maximized = false;
+                }
             } else {
                 // Set defaults if general section is missing
                 theme = "default";
@@ -104,6 +112,7 @@ public class ConfigManager {
                 font = "Hack";
                 font_size = 13;
                 hide_tab_bar = false;
+                start_maximized = false;
             }
 
             // Load shortcuts
@@ -122,6 +131,7 @@ public class ConfigManager {
             font = "Hack";
             font_size = 13;
             hide_tab_bar = false;
+            start_maximized = false;
         }
     }
 
@@ -158,6 +168,9 @@ public class ConfigManager {
     // Update hide_tab_bar setting and save to config file
     public void update_hide_tab_bar(bool new_hide_tab_bar) {
         hide_tab_bar = new_hide_tab_bar;
+    // Update start_maximized setting and save to config file
+    public void update_start_maximized(bool new_start_maximized) {
+        start_maximized = new_start_maximized;
         save_config();
     }
 
@@ -171,6 +184,7 @@ public class ConfigManager {
             config_file.set_string("general", "font", font);
             config_file.set_integer("general", "font_size", font_size);
             config_file.set_boolean("general", "hide_tab_bar", hide_tab_bar);
+            config_file.set_boolean("general", "start_maximized", start_maximized);
 
             // Save to file
             string data = config_file.to_data();
