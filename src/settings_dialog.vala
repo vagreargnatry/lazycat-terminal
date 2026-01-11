@@ -745,19 +745,19 @@ private class ThemeListWidget : SettingsListWidget {
             key_file.load_from_file(theme_file.get_path(), KeyFileFlags.NONE);
 
             if (key_file.has_key("theme", "background")) {
-                colors.background = parse_color(key_file.get_string("theme", "background"));
+                colors.background = parse_color(key_file.get_string("theme", "background").strip());
             }
             if (key_file.has_key("theme", "foreground")) {
-                colors.foreground = parse_color(key_file.get_string("theme", "foreground"));
+                colors.foreground = parse_color(key_file.get_string("theme", "foreground").strip());
             }
             if (key_file.has_key("theme", "color_11")) {
-                colors.color_11 = parse_color(key_file.get_string("theme", "color_11"));
+                colors.color_11 = parse_color(key_file.get_string("theme", "color_11").strip());
             }
             if (key_file.has_key("theme", "color_13")) {
-                colors.color_13 = parse_color(key_file.get_string("theme", "color_13"));
+                colors.color_13 = parse_color(key_file.get_string("theme", "color_13").strip());
             }
             if (key_file.has_key("theme", "tab")) {
-                colors.tab = parse_color(key_file.get_string("theme", "tab"));
+                colors.tab = parse_color(key_file.get_string("theme", "tab").strip());
             }
         } catch (Error e) {
             warning("Error loading theme file %s: %s", theme_file.get_path(), e.message);
