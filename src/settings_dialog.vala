@@ -127,19 +127,19 @@ public class SettingsDialog : Gtk.Window {
         lists_box.set_vexpand(true);
 
         // Font list (1.5x width)
-        font_list = new FontListWidget(foreground_color);
+        font_list = new FontListWidget(foreground_color, background_color);
         font_list.set_hexpand(true);
         font_list.set_size_request(300, 300);  // Wider
         lists_box.append(font_list);
 
         // Font size list (1/3 width)
-        font_size_list = new FontSizeListWidget(foreground_color);
+        font_size_list = new FontSizeListWidget(foreground_color, background_color);
         font_size_list.set_hexpand(false);
         font_size_list.set_size_request(100, 300);  // Narrower
         lists_box.append(font_size_list);
 
         // Theme list (normal width)
-        theme_list = new ThemeListWidget(foreground_color);
+        theme_list = new ThemeListWidget(foreground_color, background_color);
         theme_list.set_hexpand(true);
         theme_list.set_size_request(200, 300);
         lists_box.append(theme_list);
@@ -352,15 +352,15 @@ public class SettingsDialog : Gtk.Window {
         // Reload CSS with new colors
         load_css();
 
-        // Update list widgets with new foreground color
+        // Update list widgets with new foreground and background colors
         if (font_list != null) {
-            font_list.update_foreground_color(new_fg_color);
+            font_list.update_colors(new_fg_color, new_bg_color);
         }
         if (font_size_list != null) {
-            font_size_list.update_foreground_color(new_fg_color);
+            font_size_list.update_colors(new_fg_color, new_bg_color);
         }
         if (theme_list != null) {
-            theme_list.update_foreground_color(new_fg_color);
+            theme_list.update_colors(new_fg_color, new_bg_color);
         }
         if (transparency_slider != null) {
             transparency_slider.update_foreground_color(new_fg_color);
@@ -371,13 +371,15 @@ public class SettingsDialog : Gtk.Window {
 // Base class for settings list widgets
 private abstract class SettingsListWidget : Gtk.DrawingArea {
     protected Gdk.RGBA foreground_color;
+    protected Gdk.RGBA background_color;
     protected int selected_index = 0;
     protected bool is_focused = false;
     protected const int ITEM_HEIGHT = 30;
     protected const int PADDING = 5;
 
-    protected SettingsListWidget(Gdk.RGBA fg_color) {
+    protected SettingsListWidget(Gdk.RGBA fg_color, Gdk.RGBA bg_color) {
         foreground_color = fg_color;
+        background_color = bg_color;
         set_draw_func(draw_list);
 
         // Add scrolling support
@@ -413,6 +415,12 @@ private abstract class SettingsListWidget : Gtk.DrawingArea {
         queue_draw();
     }
 
+    public void update_colors(Gdk.RGBA new_fg_color, Gdk.RGBA new_bg_color) {
+        foreground_color = new_fg_color;
+        background_color = new_bg_color;
+        queue_draw();
+    }
+
     private bool on_scroll(double dx, double dy) {
         if (dy > 0) {
             move_selection_down();
@@ -423,7 +431,7 @@ private abstract class SettingsListWidget : Gtk.DrawingArea {
     }
 
     protected void draw_border(Cairo.Context cr, int width, int height) {
-        // First, fill the rounded rectangle with semi-transparent black background
+        // First, fill the rounded rectangle with semi-transparent theme background
         double radius = 5.0;
         double line_width = is_focused ? 2.0 : 1.0;
         double x = line_width / 2.0;
@@ -439,8 +447,17 @@ private abstract class SettingsListWidget : Gtk.DrawingArea {
         cr.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
         cr.close_path();
 
-        // Fill with semi-transparent black
-        cr.set_source_rgba(0, 0, 0, 0.3);
+        // Fill with semi-transparent theme background (0.3 alpha for dark backgrounds, 0.5 for light)
+        double brightness = 0.299 * background_color.red + 0.587 * background_color.green + 0.114 * background_color.blue;
+        bool is_light = brightness > 0.5;
+        double alpha = is_light ? 0.5 : 0.3;
+
+        cr.set_source_rgba(
+            background_color.red,
+            background_color.green,
+            background_color.blue,
+            alpha
+        );
         cr.fill_preserve();
 
         // Draw border
@@ -482,8 +499,8 @@ private abstract class SettingsListWidget : Gtk.DrawingArea {
 private class FontListWidget : SettingsListWidget {
     private string[] fonts;
 
-    public FontListWidget(Gdk.RGBA fg_color) {
-        base(fg_color);
+    public FontListWidget(Gdk.RGBA fg_color, Gdk.RGBA bg_color) {
+        base(fg_color, bg_color);
         load_fonts();
         set_size_request(200, 300);
     }
@@ -571,8 +588,8 @@ private class FontSizeListWidget : SettingsListWidget {
     private const int MIN_SIZE = 8;
     private const int MAX_SIZE = 48;
 
-    public FontSizeListWidget(Gdk.RGBA fg_color) {
-        base(fg_color);
+    public FontSizeListWidget(Gdk.RGBA fg_color, Gdk.RGBA bg_color) {
+        base(fg_color, bg_color);
         set_size_request(200, 300);
         selected_index = 6; // Default to size 14
     }
@@ -635,8 +652,8 @@ private class ThemeListWidget : SettingsListWidget {
         Gdk.RGBA tab;
     }
 
-    public ThemeListWidget(Gdk.RGBA fg_color) {
-        base(fg_color);
+    public ThemeListWidget(Gdk.RGBA fg_color, Gdk.RGBA bg_color) {
+        base(fg_color, bg_color);
         load_themes();
         set_size_request(200, 300);
     }
