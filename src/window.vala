@@ -696,19 +696,13 @@ public class TerminalWindow : ShadowWindow {
     }
 
     private void setup_snap_detection() {
-        // Monitor window size changes to detect snap positions
+        // Monitor window size changes to detect snap positions (debounced by parent class)
         notify["default-width"].connect(detect_snap_position);
         notify["default-height"].connect(detect_snap_position);
 
-        // Use map signal instead of realize
+        // Use map signal for initial detection
         map.connect(() => {
             detect_snap_position();
-        });
-
-        // Use tick callback for continuous position monitoring
-        add_tick_callback((widget, clock) => {
-            detect_snap_position();
-            return true;
         });
     }
 

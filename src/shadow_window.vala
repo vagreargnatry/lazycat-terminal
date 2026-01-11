@@ -26,6 +26,8 @@ public class ShadowWindow : Gtk.ApplicationWindow {
     private WindowSnapPosition snap_position = WindowSnapPosition.NONE;
     private int window_width = 0;
     private int window_height = 0;
+    private uint position_check_source_id = 0;
+    private bool initial_check_done = false;
 
     // Monitor info for snap detection
     private int monitor_width = 1920;
@@ -324,10 +326,28 @@ public class ShadowWindow : Gtk.ApplicationWindow {
             update_input_region_for_current_state();
         });
 
-        // Setup frame clock for position tracking
-        add_tick_callback((widget, clock) => {
+        // Track size changes with debounce
+        notify["default-width"].connect(schedule_position_check);
+        notify["default-height"].connect(schedule_position_check);
+
+        // Do initial check once after window is mapped
+        map.connect(() => {
+            if (!initial_check_done) {
+                initial_check_done = true;
+                check_window_position();
+            }
+        });
+    }
+
+    private void schedule_position_check() {
+        // Debounce: cancel pending check and schedule a new one
+        if (position_check_source_id != 0) {
+            Source.remove(position_check_source_id);
+        }
+        position_check_source_id = GLib.Timeout.add(50, () => {
+            position_check_source_id = 0;
             check_window_position();
-            return true;
+            return false;
         });
     }
 

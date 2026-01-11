@@ -25,10 +25,11 @@ public class TerminalTab : Gtk.Box {
         set { _is_first_tab = value; }
     }
 
-    // Search box components
+    // Search box components (lazy-created)
     private Gtk.Box? search_box = null;
     private Gtk.Entry? search_entry = null;
     private Gtk.DrawingArea? search_icon = null;
+    private Gtk.Overlay? main_overlay = null;
     private bool search_box_visible = false;
     private string last_search_text = "";
     private int64 last_search_position = -1;
@@ -101,20 +102,17 @@ public class TerminalTab : Gtk.Box {
         var scrolled = create_scrolled_window(terminal);
         root_widget = scrolled;
 
-        // Create overlay to hold terminal and search box
-        var overlay = new Gtk.Overlay();
-        overlay.set_child(root_widget);
+        // Create overlay to hold terminal (search box will be added lazily when needed)
+        main_overlay = new Gtk.Overlay();
+        main_overlay.set_child(root_widget);
 
-        // Create search box (initially hidden)
-        create_search_box();
-        overlay.add_overlay(search_box);
-
-        append(overlay);
+        append(main_overlay);
         add_css_class("transparent-tab");
 
         // Note: Terminal initialization (spawn shell or launch command)
         // is deferred to initialize_terminal() which is called via GLib.Idle.add()
         // in the constructor, after is_first_tab has been properly set.
+        // Search box is also created lazily when first needed.
     }
 
     private static string get_mono_font() {
@@ -122,6 +120,7 @@ public class TerminalTab : Gtk.Box {
             return cached_mono_font;
         }
 
+        // Synchronous query - only runs once, then cached
         int result_length = 0;
         string[]? fonts = FontUtils.list_mono_or_dot_fonts(out result_length);
 
@@ -181,9 +180,9 @@ public class TerminalTab : Gtk.Box {
 
         terminal.set_colors(foreground_color, background_color, color_palette);
 
-        // Set font - use first available monospace font from system
+        // Set font - use cached font and current font size
         string mono_font = get_mono_font();
-        var font = Pango.FontDescription.from_string(mono_font + " 14");
+        var font = Pango.FontDescription.from_string(mono_font + " " + current_font_size.to_string());
         terminal.set_font(font);
 
         terminal.set_vexpand(true);
@@ -1529,6 +1528,14 @@ public class TerminalTab : Gtk.Box {
 
     // Show search box
     public void show_search_box() {
+        // Lazy create search box on first use
+        if (search_box == null) {
+            create_search_box();
+            if (main_overlay != null && search_box != null) {
+                main_overlay.add_overlay(search_box);
+            }
+        }
+
         if (search_box != null) {
             search_box.set_visible(true);
             search_box_visible = true;
