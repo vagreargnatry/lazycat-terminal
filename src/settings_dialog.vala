@@ -646,6 +646,11 @@ private class FontListWidget : SettingsListWidget {
                 foreground_color.blue,
                 1.0
             );
+
+            // Set the font face to the actual font name so it renders in its own style
+            cr.select_font_face(fonts[i], Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
+            cr.set_font_size(12);
+
             cr.move_to(PADDING + 5, y + ITEM_HEIGHT / 2 + 5);
             cr.show_text(fonts[i]);
             y += ITEM_HEIGHT;
