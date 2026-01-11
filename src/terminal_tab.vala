@@ -13,6 +13,7 @@ public class TerminalTab : Gtk.Box {
     private HashTable<Vte.Terminal, string> terminal_titles;  // Store title for each terminal
     private HashTable<Vte.Terminal, int> terminal_pids;  // Store child pid for each terminal
     private HashTable<Vte.Terminal, bool> press_anything;  // Track if user pressed any key in terminal
+    private HashTable<Vte.Terminal, GenericArray<int64?>> command_positions;  // Track command execution row positions
     public bool is_active_tab { get; set; default = false; }  // Track if this tab is currently active
 
     // Command execution support
@@ -83,6 +84,9 @@ public class TerminalTab : Gtk.Box {
 
         // Initialize press_anything hash table
         press_anything = new HashTable<Vte.Terminal, bool>(direct_hash, direct_equal);
+
+        // Initialize command_positions hash table
+        command_positions = new HashTable<Vte.Terminal, GenericArray<int64?>>(direct_hash, direct_equal);
 
         // Initialize CSS provider for paned styling and add to global display
         paned_css_provider = new Gtk.CssProvider();
@@ -244,6 +248,11 @@ public class TerminalTab : Gtk.Box {
                     close_terminal(terminal);
                     return true;
                 }
+            }
+
+            // Record cursor position when Enter is pressed (command execution)
+            if (keyval == Gdk.Key.Return || keyval == Gdk.Key.KP_Enter) {
+                record_command_position(terminal);
             }
 
             // Set press_anything flag when user presses any key
@@ -636,6 +645,165 @@ public class TerminalTab : Gtk.Box {
         }
     }
 
+    // Record command position when Enter is pressed
+    private void record_command_position(Vte.Terminal terminal) {
+        // Get current cursor position
+        long column, row;
+        terminal.get_cursor_position(out column, out row);
+
+        // Get or create the positions array for this terminal
+        var positions = command_positions.get(terminal);
+        if (positions == null) {
+            positions = new GenericArray<int64?>();
+            command_positions.set(terminal, positions);
+        }
+
+        // Add the current row position
+        positions.add((int64)row);
+
+        // Limit stored positions to last 100 commands to avoid memory issues
+        while (positions.length > 100) {
+            positions.remove_index(0);
+        }
+    }
+
+    // Copy the last command output to clipboard
+    public void copy_last_output() {
+        if (focused_terminal == null) {
+            return;
+        }
+
+        // Get all terminal text using the non-deprecated API
+        string? text = focused_terminal.get_text_format(Vte.Format.TEXT);
+        if (text == null || text.length == 0) {
+            return;
+        }
+
+        // Split into lines and remove trailing empty lines
+        string[] lines = text.split("\n");
+        int end_index = lines.length - 1;
+        while (end_index >= 0 && lines[end_index].strip() == "") {
+            end_index--;
+        }
+
+        if (end_index < 0) {
+            return;
+        }
+
+        // Try to use recorded command positions first
+        var positions = command_positions.get(focused_terminal);
+        if (positions != null && positions.length >= 2) {
+            // Get the last two command positions
+            int64? last_cmd_row = positions.get(positions.length - 1);
+            int64? prev_cmd_row = positions.get(positions.length - 2);
+
+            if (last_cmd_row != null && prev_cmd_row != null) {
+                // Convert absolute row to line index in text
+                // The text from get_text_format includes scrollback content
+                int output_start = (int)(prev_cmd_row + 1);
+                int output_end = (int)(last_cmd_row - 1);
+
+                // Ensure indices are within bounds
+                if (output_start >= 0 && output_end < lines.length && output_start <= output_end) {
+                    // Build output text
+                    var output = new StringBuilder();
+                    for (int i = output_start; i <= output_end; i++) {
+                        if (i > output_start) {
+                            output.append("\n");
+                        }
+                        output.append(lines[i]);
+                    }
+
+                    string output_text = output.str.strip();
+                    if (output_text.length > 0) {
+                        // Copy to clipboard
+                        var display = Gdk.Display.get_default();
+                        if (display != null) {
+                            var clipboard = display.get_clipboard();
+                            clipboard.set_text(output_text);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Fallback: use prompt detection method
+        // Find the current prompt line (last non-empty line is usually the prompt)
+        int current_prompt_index = end_index;
+
+        // Find the previous prompt line (line containing shell prompt characters)
+        int command_line_index = -1;
+        for (int i = current_prompt_index - 1; i >= 0; i--) {
+            string line = lines[i].strip();
+            if (line.length > 0 && is_likely_prompt_line(line)) {
+                command_line_index = i;
+                break;
+            }
+        }
+
+        if (command_line_index < 0) {
+            // No previous prompt found, copy everything except current line
+            command_line_index = 0;
+        }
+
+        // Extract output: from line after command to line before current prompt
+        int output_start = command_line_index + 1;
+        int output_end = current_prompt_index - 1;
+
+        if (output_start > output_end) {
+            // No output between prompts
+            return;
+        }
+
+        // Build output text
+        var output = new StringBuilder();
+        for (int i = output_start; i <= output_end; i++) {
+            if (i > output_start) {
+                output.append("\n");
+            }
+            output.append(lines[i]);
+        }
+
+        string output_text = output.str.strip();
+        if (output_text.length == 0) {
+            return;
+        }
+
+        // Copy to clipboard
+        var display = Gdk.Display.get_default();
+        if (display != null) {
+            var clipboard = display.get_clipboard();
+            clipboard.set_text(output_text);
+        }
+    }
+
+    // Helper to detect if a line looks like a shell prompt
+    private bool is_likely_prompt_line(string line) {
+        string trimmed = line.strip();
+        if (trimmed.length == 0) {
+            return false;
+        }
+
+        // Check for common prompt endings
+        if (trimmed.has_suffix("$") || trimmed.has_suffix("#") ||
+            trimmed.has_suffix(">") || trimmed.has_suffix("%")) {
+            return true;
+        }
+
+        // Check for user@host pattern
+        if (trimmed.contains("@") && (trimmed.contains(":") || trimmed.contains("~"))) {
+            return true;
+        }
+
+        // Check for common prompt patterns like ">>> " (Python) or "... "
+        if (trimmed.has_prefix(">>>") || trimmed.has_prefix("...")) {
+            return true;
+        }
+
+        return false;
+    }
+
     public void paste_clipboard() {
         if (focused_terminal != null) {
             focused_terminal.paste_clipboard();
@@ -764,11 +932,11 @@ public class TerminalTab : Gtk.Box {
         spawn_shell_in_terminal(new_terminal, cwd);
 
         // Show all widgets and update layout
-        this.show();
-        paned.show();
-        focused_scrolled.show();
-        new_scrolled.show();
-        new_terminal.show();
+        this.set_visible(true);
+        paned.set_visible(true);
+        focused_scrolled.set_visible(true);
+        new_scrolled.set_visible(true);
+        new_terminal.set_visible(true);
         this.queue_resize();
 
         // Focus the new terminal
@@ -873,11 +1041,11 @@ public class TerminalTab : Gtk.Box {
         spawn_shell_in_terminal(new_terminal, cwd);
 
         // Show all widgets and update layout
-        this.show();
-        paned.show();
-        focused_scrolled.show();
-        new_scrolled.show();
-        new_terminal.show();
+        this.set_visible(true);
+        paned.set_visible(true);
+        focused_scrolled.set_visible(true);
+        new_scrolled.set_visible(true);
+        new_terminal.set_visible(true);
         this.queue_resize();
 
         // Focus the new terminal

@@ -18,7 +18,7 @@ public class ConfigManager {
         shortcuts = new HashTable<string, string>(str_hash, str_equal);
 
         // Set default configuration path
-        string config_dir = Path.build_filename(Environment.get_home_dir(), ".config", "lazycat-theme");
+        string config_dir = Path.build_filename(Environment.get_home_dir(), ".config", "lazycat-terminal");
         config_path = Path.build_filename(config_dir, "config.conf");
 
         // Check and copy config file if needed
@@ -41,7 +41,7 @@ public class ConfigManager {
                     dir.make_directory_with_parents();
                 }
 
-                // Copy config.conf from current directory to ~/.config/lazycat-theme/
+                // Copy config.conf from current directory to ~/.config/lazycat-terminal/
                 string source_path = Path.build_filename(Environment.get_current_dir(), "config.conf");
                 var source_file = File.new_for_path(source_path);
 

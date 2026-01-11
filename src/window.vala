@@ -324,6 +324,16 @@ public class TerminalWindow : ShadowWindow {
                 return true;
             }
 
+            // Copy last command output
+            string? copy_last_output_shortcut = config.get_shortcut("copy_last_output");
+            if (copy_last_output_shortcut != null && key_name == copy_last_output_shortcut) {
+                if (tabs.length() > 0) {
+                    var tab = tabs.nth_data((uint)tab_bar.get_active_index());
+                    if (tab != null) tab.copy_last_output();
+                }
+                return true;
+            }
+
             // Paste
             string? paste_shortcut = config.get_shortcut("paste");
             if (paste_shortcut != null && key_name == paste_shortcut) {
