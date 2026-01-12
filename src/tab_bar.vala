@@ -45,6 +45,8 @@ public class TabBar : Gtk.DrawingArea {
     private const int NEW_TAB_BTN_SIZE = 36;  // 36px button size
     private const int NEW_TAB_BTN_MARGIN_LEFT = 20;  // 20px left margin
     private const int CORNER_RADIUS = 10;
+    // Reserved space for right side: new_tab_btn + gap + settings_btn + gap + window_controls
+    private const int RIGHT_RESERVED_WIDTH = NEW_TAB_BTN_SIZE + 10 + NEW_TAB_BTN_SIZE + 10 + (int)CTRL_BTN_AREA_WIDTH;  // 177
 
     // Scrolling constants
     private const int SCROLL_BTN_WIDTH = 24;
@@ -124,7 +126,7 @@ public class TabBar : Gtk.DrawingArea {
         if (scrolling_enabled) {
             cr.save();
             int clip_x = TAB_PADDING;
-            int clip_width = width - clip_x - (NEW_TAB_BTN_SIZE + 20 + 90);
+            int clip_width = width - clip_x - RIGHT_RESERVED_WIDTH;
             cr.rectangle(clip_x, 0, clip_width, height);
             cr.clip();
         }
@@ -184,8 +186,8 @@ public class TabBar : Gtk.DrawingArea {
             return;
         }
 
-        // Reserve space for new tab button and window controls
-        int reserved = NEW_TAB_BTN_SIZE + 20 + 90;
+        // Reserve space for new tab button, settings button, and window controls
+        int reserved = RIGHT_RESERVED_WIDTH;
         int usable_width = available_width - reserved - TAB_PADDING;
 
         // Calculate total width needed using each tab's individual width
@@ -492,12 +494,14 @@ public class TabBar : Gtk.DrawingArea {
         // In scrolling mode, position is fixed relative to right side
         if (scrolling_enabled) {
             int width = get_width();
-            int reserved = NEW_TAB_BTN_SIZE + 20 + 90;
-            return width - reserved;
+            return width - RIGHT_RESERVED_WIDTH;
         }
 
         var last = tab_infos.nth_data((uint)(tab_infos.length() - 1));
-        return last.x + last.width - TAB_OVERLAP + 8 + NEW_TAB_BTN_MARGIN_LEFT;
+        double natural_x = last.x + last.width - TAB_OVERLAP + 8 + NEW_TAB_BTN_MARGIN_LEFT;
+        // Cap position to not overlap with settings button
+        double max_x = get_width() - RIGHT_RESERVED_WIDTH;
+        return double.min(natural_x, max_x);
     }
 
     private double get_settings_button_x() {
@@ -783,7 +787,7 @@ public class TabBar : Gtk.DrawingArea {
 
         // Define visible area boundaries
         int visible_start = TAB_PADDING;
-        int visible_end = width - (NEW_TAB_BTN_SIZE + 20 + 90);
+        int visible_end = width - RIGHT_RESERVED_WIDTH;
 
         // Tab's current screen position (info.x already includes scroll offset)
         int tab_left = info.x;
